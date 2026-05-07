@@ -39,9 +39,9 @@
         .btn-warning { background: #fef3c7; border-color: #fde68a; color: #92400e; }
         .btn-sm { padding: 4px 10px; font-size: 0.7rem; }
         
-        .meeting-item { background: #f8fafc; border-radius: 0.75rem; padding: 1rem; margin-bottom: 0.75rem; border: 1px solid #e2e8f0; transition: all 0.2s; }
+        .meeting-item { background: #f8fafc; border-radius: 0.75rem; padding: 1rem; margin-bottom: 0.75rem; border: 1px solid #e2e8f0; transition: all 0.2s; cursor: pointer; }
         .meeting-item:hover { border-color: #003399; background: #eff6ff; }
-        .meeting-title { font-weight: 700; font-size: 1rem; color: #003399; cursor: pointer; }
+        .meeting-title { font-weight: 700; font-size: 1rem; color: #003399; }
         .meta { font-size: 0.75rem; color: #64748b; margin: 6px 0; display: flex; gap: 12px; flex-wrap: wrap; }
         .action-group { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
         
@@ -69,51 +69,49 @@
 
 <script>
     // ==================== КОНФИГУРАЦИЈА ====================
-    // ⚠️ ЗАМЕНЕТЕ ГО ОВОЈ URL СО ВАШИОТ ОД APPS SCRIPT!
-    const API_URL = "https://script.google.com/macros/s/AKfycbx5Q8xJHO3qbT5Ebc47iX2sN3K0oUzIeY2MemUO62hF0X9DbeUqUIQw3t9K438yeQrZ/exec";
+    const API_URL = "https://script.google.com/macros/s/TVOJOT_URL_OVDE/exec";
     
-    // ЛОКАЛНИ КОРИСНИЦИ (за најава)
+    // ЛОКАЛНИ КОРИСНИЦИ
     const USERS = [
         { id: 1, name: "Дарко Димитров", position: "Раководител на сектор", email: "darko.dimitrov@na.org.mk", password: "12345", isAdmin: true },
         { id: 2, name: "Ана Митровска", position: "Директор", email: "ana.mihajlov@na.org.mk", password: "abcd", isAdmin: false }
     ];
     
-    let meetings = [];
+    // ГЛОБАЛНИ ПРОМЕНЛИВИ
+    let meetings = [
+        { id: 1, title_mk: "Кик-офф состанок", title_en: "Kick-off meeting", date: "2026-05-15", time: "10:00", location: "Голема сала", attendees: "darko.dimitrov@na.org.mk, ana.mihajlov@na.org.mk", agenda_mk: "1. Отворање\n2. План", agenda_en: "", minutes_mk: "Договорени чекори", minutes_en: "", decisions_mk: "Започнуваме", decisions_en: "", isArchived: false, notifications: [{ message: "Состанокот е креиран", date: new Date().toISOString() }], created_by: 1, created_by_name: "Дарко Димитров" }
+    ];
     let currentUser = null;
     let currentTab = "meetings";
     let lang = "mk";
     let editMeetingId = null;
     
-    // Преводи
+    // ПРЕВОДИ
     const translations = {
-        mk: { meetings: "Состаноци", newMeeting: "Нов состанок", archive: "Архива", notifications: "Нотификации", employees: "Вработени",
+        mk: { 
+            meetings: "Состаноци", newMeeting: "Нов состанок", archive: "Архива", notifications: "Нотификации", employees: "Вработени",
             loginTitle: "Најава", email: "Е-пошта", password: "Лозинка", login: "Најави се", logout: "Одјави се",
             title: "Наслов", date: "Датум", time: "Време", location: "Локација", attendees: "Присутни",
             agenda: "Дневен ред", minutes: "Записник", decisions: "Заклучоци", save: "Зачувај", cancel: "Откажи",
             edit: "Уреди", delete: "Избриши", archiveBtn: "Архивирај", export: "Извештај", print: "Печати",
             noActive: "Нема активни состаноци.", noArchive: "Нема архивирани состаноци.", noNotifications: "Нема нотификации.",
-            addUser: "Додади вработен", name: "Име", position: "Функција", isAdmin: "Администратор",
-            archivedBy: "Архивиран од", archived: "Архивиран", loading: "Се вчитуваат податоци..."
+            archivedBy: "Архивиран од", archived: "Архивиран"
         },
-        en: { meetings: "Meetings", newMeeting: "New Meeting", archive: "Archive", notifications: "Notifications", employees: "Employees",
+        en: { 
+            meetings: "Meetings", newMeeting: "New Meeting", archive: "Archive", notifications: "Notifications", employees: "Employees",
             loginTitle: "Login", email: "Email", password: "Password", login: "Login", logout: "Logout",
             title: "Title", date: "Date", time: "Time", location: "Location", attendees: "Attendees",
             agenda: "Agenda", minutes: "Minutes", decisions: "Decisions", save: "Save", cancel: "Cancel",
             edit: "Edit", delete: "Delete", archiveBtn: "Archive", export: "Report", print: "Print",
             noActive: "No active meetings.", noArchive: "No archived meetings.", noNotifications: "No notifications.",
-            addUser: "Add employee", name: "Name", position: "Position", isAdmin: "Administrator",
-            archivedBy: "Archived by", archived: "Archived", loading: "Loading data..."
+            archivedBy: "Archived by", archived: "Archived"
         }
     };
     
     function t(key) { return translations[lang][key] || key; }
     function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
     
-    // ==================== ЛОКАЛНИ СОСТАНОЦИ ====================
-    let meetings = [
-        { id: 1, title_mk: "Кик-офф состанок", title_en: "Kick-off meeting", date: "2026-05-15", time: "10:00", location: "Голема сала", attendees: "darko.dimitrov@na.org.mk, ana.mihajlov@na.org.mk", agenda_mk: "1. Отворање\n2. План", agenda_en: "", minutes_mk: "Договорени чекори", minutes_en: "", decisions_mk: "Започнуваме", decisions_en: "", isArchived: false, notifications: [{ message: "Состанокот е креиран", date: new Date().toISOString() }], created_by: 1, created_by_name: "Дарко Димитров" }
-    ];
-    
+    // ==================== ФУНКЦИИ ЗА СОСТАНОЦИ ====================
     function saveMeetingToLocal(m) {
         const index = meetings.findIndex(x => x.id === m.id);
         if (index === -1) {
@@ -130,21 +128,6 @@
         renderApp();
     }
     
-    // ==================== АВТЕНТИКАЦИЈА ====================
-    function login(email, password) {
-        for (var i = 0; i < USERS.length; i++) {
-            if (USERS[i].email === email && USERS[i].password === password) {
-                currentUser = USERS[i];
-                renderApp();
-                return { success: true };
-            }
-        }
-        return { success: false, error: "Погрешна е-пошта или лозинка" };
-    }
-    
-    function logout() { currentUser = null; renderApp(); }
-    
-    // ==================== СОСТАНОЦИ ====================
     function createMeeting() {
         const title = document.getElementById("title_mk")?.value;
         if (!title) { alert("Внесете наслов!"); return; }
@@ -220,6 +203,20 @@
     
     function cancelForm() { editMeetingId = null; currentTab = "meetings"; renderApp(); }
     
+    // ==================== АВТЕНТИКАЦИЈА ====================
+    function login(email, password) {
+        for (var i = 0; i < USERS.length; i++) {
+            if (USERS[i].email === email && USERS[i].password === password) {
+                currentUser = USERS[i];
+                renderApp();
+                return { success: true };
+            }
+        }
+        return { success: false, error: "Погрешна е-пошта или лозинка" };
+    }
+    
+    function logout() { currentUser = null; renderApp(); }
+    
     // ==================== ИЗВЕШТАЈ ====================
     function exportWord(meeting) {
         const date = new Date(meeting.date);
@@ -254,7 +251,7 @@
         let html = `<div class="card"><div class="card-header"><span class="card-title">📋 ${t('meetings')}</span></div>`;
         for (var i = 0; i < active.length; i++) {
             var m = active[i];
-            html += `<div class="meeting-item" onclick="viewMeeting(${m.id})" style="cursor:pointer;">
+            html += `<div class="meeting-item" onclick="viewMeeting(${m.id})">
                 <div class="meeting-title">${escapeHtml(m.title_mk)}</div>
                 <div class="meta">📅 ${m.date} | ⏰ ${m.time} | 📍 ${escapeHtml(m.location)} | 👥 ${escapeHtml(m.attendees || '')}</div>
                 <div class="action-group" onclick="event.stopPropagation()">
@@ -277,7 +274,7 @@
         let html = `<div class="card"><div class="card-header"><span class="card-title">📦 ${t('archive')}</span></div>`;
         for (var i = 0; i < archived.length; i++) {
             var m = archived[i];
-            html += `<div class="meeting-item" onclick="viewMeeting(${m.id})" style="cursor:pointer;">
+            html += `<div class="meeting-item" onclick="viewMeeting(${m.id})">
                 <div class="meeting-title" style="color:#64748b;">${escapeHtml(m.title_mk)} <span class="archived-badge">${t('archived')}</span></div>
                 <div class="meta">📅 ${m.date} | ⏰ ${m.time} | 📍 ${escapeHtml(m.location)} | 👥 ${escapeHtml(m.attendees || '')}</div>
                 <div style="font-size:0.7rem; color:#166534; margin-top:5px;">✅ ${t('archivedBy')}: ${escapeHtml(m.archivedByName || m.created_by_name)}</div>
@@ -386,7 +383,6 @@
         var root = document.getElementById('appRoot');
         if (!currentUser) {
             root.innerHTML = renderLogin();
-            // Clear fields
             var emailEl = document.getElementById('loginEmail');
             var pwdEl = document.getElementById('loginPassword');
             if (emailEl) emailEl.value = '';
@@ -416,7 +412,7 @@
     
     function setLanguage(l) { lang = l; renderApp(); }
     
-    // Global functions for buttons
+    // Глобални функции
     window.viewMeeting = viewMeeting;
     window.doLogin = function() {
         var email = document.getElementById('loginEmail').value;
@@ -440,7 +436,7 @@
     window.cancelForm = cancelForm;
     window.setLanguage = setLanguage;
     
-    // Start the app
+    // Старт
     renderApp();
 </script>
 </body>
