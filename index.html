@@ -148,7 +148,7 @@
             edit: "Уреди", delete: "Избриши", archiveBtn: "Архивирај", export: "Извештај", print: "Печати",
             noActive: "Нема активни состаноци.", noArchive: "Нема архивирани состаноци.", noNotifications: "Нема нотификации.",
             archivedBy: "Архивиран од", archived: "Архивиран", addUser: "Додади вработен", name: "Име", position: "Функција", isAdmin: "Администратор", password: "Лозинка",
-            reportTitle: "ИЗВЕШТАЈ ОД СОСТАНОК", signature: "Потпис", positionLabel: "Позиција"
+            reportTitle: "ИЗВЕШТАЈ ОД СОСТАНОК"
         },
         en: { 
             meetings: "Meetings", newMeeting: "New Meeting", archive: "Archive", notifications: "Notifications", employees: "Employees", calendar: "Calendar",
@@ -158,7 +158,7 @@
             edit: "Edit", delete: "Delete", archiveBtn: "Archive", export: "Report", print: "Print",
             noActive: "No active meetings.", noArchive: "No archived meetings.", noNotifications: "No notifications.",
             archivedBy: "Archived by", archived: "Archived", addUser: "Add employee", name: "Name", position: "Position", isAdmin: "Administrator", password: "Password",
-            reportTitle: "MEETING REPORT", signature: "Signature", positionLabel: "Position"
+            reportTitle: "MEETING REPORT"
         }
     };
     
@@ -192,7 +192,7 @@
                     id: m.id,
                     title_mk: m.title_mk || '',
                     title_en: m.title_en || '',
-                    date: m.date || '',
+                    date: m.date ? m.date.split('T')[0] : '',
                     time: m.time || '10:00',
                     location: m.location || '',
                     attendees: m.attendees || '',
@@ -233,14 +233,20 @@
         } else {
             users = [
                 { id: 1, name: "Дарко Димитров", position: "Раководител на сектор", email: "darko.dimitrov@na.org.mk", password: "12345", isAdmin: true },
-                { id: 2, name: "Ана Митровска", position: "Директор", email: "ana.mihajlov@na.org.mk", password: "abcd", isAdmin: false },
-                { id: 3, name: "Марија Стојановска", position: "Помошник раководител", email: "marija@na.org.mk", password: "12345", isAdmin: false }
+                { id: 2, name: "Ана Митровска", position: "Директор", email: "ana.mihajlov@na.org.mk", password: "abcd", isAdmin: false }
             ];
+            for (var i = 0; i < users.length; i++) {
+                await apiPost('saveUser', users[i]);
+            }
         }
     }
     
     async function saveUserToCloud(user) {
-        await apiPost('saveUser', user);
+        if (user.id && user.id !== -1) {
+            await apiPost('updateUser', user);
+        } else {
+            await apiPost('saveUser', user);
+        }
         await loadUsersFromCloud();
     }
     
@@ -373,185 +379,17 @@
     
     function cancelForm() { editMeetingId = null; currentTab = "meetings"; renderApp(); }
     
-    // ==================== АВТЕНТИКАЦИЈА (со зачувување во сесија) ====================
-    async function login(email, password) {
-        await loadUsersFromCloud();
-        for (var i = 0; i < users.length; i++) {
-            if (users[i].email === email && users[i].password === password) {
-                currentUser = users[i];
-                sessionStorage.setItem('na_nau_currentUser', JSON.stringify(currentUser));
-                await loadMeetingsFromCloud();
-                renderApp();
-                return { success: true };
-            }
-        }
-        return { success: false, error: "Погрешна е-пошта или лозинка" };
-    }
-    
-    function logout() { 
-        currentUser = null; 
-        sessionStorage.removeItem('na_nau_currentUser');
-        renderApp(); 
-    }
-    
-    // ==================== ПРОФЕСИОНАЛЕН WORD ИЗВЕШТАЈ (ДВОЈАЗИЧЕН СО ПОТПИСИ) ====================
+    // ==================== WORD ИЗВЕШТАЈ ====================
     function exportWord(meeting) {
         const date = new Date(meeting.date);
         const formattedDate = `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`;
         const attendees = (meeting.attendees || '').split(',').map(s => s.trim()).filter(s => s);
         
-        let signaturesHtml = '<div class="signatures-section" style="margin-top: 30px;"><h3 style="color: #003399; margin-bottom: 15px;">' + (lang === 'mk' ? '4. ПОТПИСИ НА ПРИСУТНИТЕ' : '4. SIGNATURES OF ATTENDEES') + '</h3>';
+        let signaturesHtml = '<div style="margin-top: 30px;"><h3 style="color: #003399; margin-bottom: 15px;">' + (lang === 'mk' ? '4. ПОТПИСИ НА ПРИСУТНИТЕ' : '4. SIGNATURES OF ATTENDEES') + '</h3>';
         signaturesHtml += '<table style="width: 100%; border-collapse: collapse; margin-top: 15px;">';
         signaturesHtml += '<thead><tr style="background-color: #003399; color: white;">';
         signaturesHtml += '<th style="padding: 10px; border: 1px solid #ddd; text-align: left;">' + (lang === 'mk' ? 'Име и презиме' : 'Full name') + '</th>';
         signaturesHtml += '<th style="padding: 10px; border: 1px solid #ddd; text-align: left;">' + (lang === 'mk' ? 'Позиција' : 'Position') + '</th>';
-        signaturesHtml += '<th style="padding: 10px; border: 1px solid #ddd; text-align: center;">' + (lang === 'mk' ? 'Потпис' : 'Signature') + '</th>';
-        signaturesHtml += '<th style="padding: 10px; border: 1px solid #ddd; text-align: center;">' + (lang === 'mk' ? 'Датум' : 'Date') + '</th>';
-        signaturesHtml += '</tr></thead><tbody>';
-        
-        for (var i = 0; i < attendees.length; i++) {
-            var email = attendees[i];
-            var user = null;
-            for (var j = 0; j < users.length; j++) {
-                if (users[j].email === email) {
-                    user = users[j];
-                    break;
-                }
-            }
-            var name = user ? user.name : email;
-            var position = user ? user.position : (lang === 'mk' ? 'Присутен' : 'Attendee');
-            
-            signaturesHtml += '<tr style="border-bottom: 1px solid #ddd;">';
-            signaturesHtml += '<td style="padding: 8px; border: 1px solid #ddd;">' + escapeHtml(name) + '</td>';
-            signaturesHtml += '<td style="padding: 8px; border: 1px solid #ddd;">' + escapeHtml(position) + '</td>';
-            signaturesHtml += '<td style="padding: 8px; border: 1px solid #ddd; text-align: center;">_______________</td>';
-            signaturesHtml += '<td style="padding: 8px; border: 1px solid #ddd; text-align: center;">' + formattedDate + '</td>';
-            signaturesHtml += '</tr>';
-        }
-        signaturesHtml += '</tbody></table></div>';
-        
-        const html = `<!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>${escapeHtml(meeting.title_mk)} - ${t('reportTitle')}</title>
-            <style>
-                body {
-                    font-family: 'Calibri', 'Times New Roman', Arial, sans-serif;
-                    margin: 2rem;
-                    line-height: 1.4;
-                    color: #1a1a1a;
-                }
-                .header {
-                    text-align: center;
-                    margin-bottom: 30px;
-                    border-bottom: 2px solid #003399;
-                    padding-bottom: 15px;
-                }
-                .eu-logo {
-                    font-size: 24px;
-                    font-weight: bold;
-                    color: #003399;
-                    letter-spacing: 2px;
-                }
-                .eu-logo span { color: #ffcc00; }
-                .title { font-size: 28px; font-weight: bold; color: #003399; margin: 20px 0 5px; }
-                .subtitle { font-size: 14px; color: #666; }
-                .info-box {
-                    background: #f5f5f5;
-                    padding: 15px;
-                    border-radius: 8px;
-                    margin: 20px 0;
-                    border-left: 4px solid #003399;
-                }
-                .section-title {
-                    background-color: #003399;
-                    color: white;
-                    padding: 8px 15px;
-                    border-radius: 5px;
-                    margin: 25px 0 15px;
-                    font-size: 16px;
-                }
-                .content { margin: 10px 0 20px 20px; }
-                table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin: 20px 0;
-                }
-                th, td {
-                    border: 1px solid #ddd;
-                    padding: 10px;
-                }
-                th {
-                    background-color: #003399;
-                    color: white;
-                }
-                .footer {
-                    margin-top: 40px;
-                    text-align: center;
-                    font-size: 10px;
-                    color: #999;
-                    border-top: 1px solid #ddd;
-                    padding-top: 15px;
-                }
-                .signatures-section {
-                    margin-top: 30px;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <div class="eu-logo">EUROPEAN UNION <span>● NA-NAU</span></div>
-                <div class="title">NA-NAU MEETING REPORT</div>
-                <div class="subtitle">${lang === 'mk' ? 'Извештај од состанок' : 'Meeting Report'}</div>
-            </div>
-            
-            <h2 style="color:#003399;">${escapeHtml(lang === 'mk' ? meeting.title_mk : (meeting.title_en || meeting.title_mk))}</h2>
-            
-            <div class="info-box">
-                <strong>📅 ${t('date')}:</strong> ${meeting.date}<br>
-                <strong>⏰ ${t('time')}:</strong> ${meeting.time}<br>
-                <strong>📍 ${t('location')}:</strong> ${escapeHtml(meeting.location)}<br>
-                <strong>👥 ${t('attendees')}:</strong> ${escapeHtml(meeting.attendees)}
-            </div>
-            
-            <div class="section-title">1. ${t('agenda')}</div>
-            <div class="content">${escapeHtml(lang === 'mk' ? meeting.agenda_mk : (meeting.agenda_en || meeting.agenda_mk)).replace(/\n/g, '<br>')}</div>
-            
-            <div class="section-title">2. ${t('minutes')}</div>
-            <div class="content">${escapeHtml(lang === 'mk' ? meeting.minutes_mk : (meeting.minutes_en || meeting.minutes_mk)).replace(/\n/g, '<br>')}</div>
-            
-            <div class="section-title">3. ${t('decisions')}</div>
-            <div class="content">${escapeHtml(lang === 'mk' ? meeting.decisions_mk : (meeting.decisions_en || meeting.decisions_mk)).replace(/\n/g, '<br>')}</div>
-            
-            ${signaturesHtml}
-            
-            <div class="footer">
-                <p>This document was generated automatically by NA-NAU Meeting Management System.</p>
-                <p>${formattedDate} | ${escapeHtml(currentUser?.name || 'NA-NAU')}</p>
-            </div>
-        </body>
-        </html>`;
-        
-        const blob = new Blob([html], { type: "application/msword" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `NA-NAU_Meeting_${(meeting.title_mk || '').replace(/[^a-z0-9]/gi, '_')}_${meeting.date}.doc`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-    }
-    
-    function printMeeting(meeting) {
-        const printWindow = window.open('', '_blank');
-        const date = new Date(meeting.date);
-        const formattedDate = `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`;
-        const attendees = (meeting.attendees || '').split(',').map(s => s.trim()).filter(s => s);
-        
-        let signaturesHtml = '<div class="signatures-section" style="margin-top: 30px;"><h3 style="color: #003399; margin-bottom: 15px;">' + (lang === 'mk' ? '4. ПОТПИСИ НА ПРИСУТНИТЕ' : '4. SIGNATURES OF ATTENDEES') + '</h3>';
-        signaturesHtml += '<table style="width: 100%; border-collapse: collapse;">';
-        signaturesHtml += '<thead><tr style="background-color: #003399; color: white;">';
-        signaturesHtml += '<th style="padding: 10px; border: 1px solid #ddd;">' + (lang === 'mk' ? 'Име и презиме' : 'Full name') + '</th>';
-        signaturesHtml += '<th style="padding: 10px; border: 1px solid #ddd;">' + (lang === 'mk' ? 'Позиција' : 'Position') + '</th>';
         signaturesHtml += '<th style="padding: 10px; border: 1px solid #ddd; text-align: center;">' + (lang === 'mk' ? 'Потпис' : 'Signature') + '</th>';
         signaturesHtml += '<th style="padding: 10px; border: 1px solid #ddd; text-align: center;">' + (lang === 'mk' ? 'Датум' : 'Date') + '</th>';
         signaturesHtml += '</table></thead><tbody>';
@@ -575,9 +413,9 @@
             signaturesHtml += '<td style="padding: 8px; border: 1px solid #ddd; text-align: center;">' + formattedDate + '</td>';
             signaturesHtml += '</tr>';
         }
-        signaturesHtml += '</tbody>赶</div>';
+        signaturesHtml += '</tbody></table></div>';
         
-        printWindow.document.write(`<!DOCTYPE html>
+        const html = `<!DOCTYPE html>
         <html>
         <head><meta charset="UTF-8"><title>${escapeHtml(meeting.title_mk)} - ${t('reportTitle')}</title>
         <style>
@@ -600,25 +438,70 @@
                 <div class="title">NA-NAU MEETING REPORT</div>
                 <div class="subtitle">${lang === 'mk' ? 'Извештај од состанок' : 'Meeting Report'}</div>
             </div>
-            <h2 style="color:#003399;">${escapeHtml(lang === 'mk' ? meeting.title_mk : (meeting.title_en || meeting.title_mk))}</h2>
+            <h2>${escapeHtml(lang === 'mk' ? meeting.title_mk : (meeting.title_en || meeting.title_mk))}</h2>
             <div class="info-box">
-                <strong>📅 ${t('date')}:</strong> ${meeting.date}<br>
-                <strong>⏰ ${t('time')}:</strong> ${meeting.time}<br>
-                <strong>📍 ${t('location')}:</strong> ${escapeHtml(meeting.location)}<br>
-                <strong>👥 ${t('attendees')}:</strong> ${escapeHtml(meeting.attendees)}
+                📅 ${t('date')}: ${meeting.date}<br>
+                ⏰ ${t('time')}: ${meeting.time}<br>
+                📍 ${t('location')}: ${escapeHtml(meeting.location)}<br>
+                👥 ${t('attendees')}: ${escapeHtml(meeting.attendees)}
             </div>
             <div class="section-title">1. ${t('agenda')}</div>
-            <div class="content">${escapeHtml(lang === 'mk' ? meeting.agenda_mk : (meeting.agenda_en || meeting.agenda_mk)).replace(/\n/g, '<br>')}</div>
+            <div>${escapeHtml(lang === 'mk' ? meeting.agenda_mk : (meeting.agenda_en || meeting.agenda_mk)).replace(/\n/g, '<br>')}</div>
             <div class="section-title">2. ${t('minutes')}</div>
-            <div class="content">${escapeHtml(lang === 'mk' ? meeting.minutes_mk : (meeting.minutes_en || meeting.minutes_mk)).replace(/\n/g, '<br>')}</div>
+            <div>${escapeHtml(lang === 'mk' ? meeting.minutes_mk : (meeting.minutes_en || meeting.minutes_mk)).replace(/\n/g, '<br>')}</div>
             <div class="section-title">3. ${t('decisions')}</div>
-            <div class="content">${escapeHtml(lang === 'mk' ? meeting.decisions_mk : (meeting.decisions_en || meeting.decisions_mk)).replace(/\n/g, '<br>')}</div>
+            <div>${escapeHtml(lang === 'mk' ? meeting.decisions_mk : (meeting.decisions_en || meeting.decisions_mk)).replace(/\n/g, '<br>')}</div>
             ${signaturesHtml}
-            <div class="footer"><p>NA-NAU · ${formattedDate}</p></div>
+            <div class="footer"><p>Generated by NA-NAU · ${formattedDate}</p></div>
         </body>
-        </html>`);
+        </html>`;
+        
+        const blob = new Blob([html], { type: "application/msword" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `NA-NAU_Meeting_${(meeting.title_mk || '').replace(/[^a-z0-9]/gi, '_')}_${meeting.date}.doc`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+    
+    function printMeeting(meeting) {
+        const printWindow = window.open('', '_blank');
+        const date = new Date(meeting.date);
+        const formattedDate = `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`;
+        const attendees = (meeting.attendees || '').split(',').map(s => s.trim()).filter(s => s);
+        
+        let signaturesHtml = '<div style="margin-top: 30px;"><h3 style="color: #003399;">' + (lang === 'mk' ? 'ПОТПИСИ НА ПРИСУТНИТЕ' : 'SIGNATURES OF ATTENDEES') + '</h3><table border="1" cellpadding="5" style="width:100%; border-collapse:collapse;">';
+        signaturesHtml += '<thead><tr bgcolor="#003399" style="color:white;"><th>' + (lang === 'mk' ? 'Име' : 'Name') + '</th><th>' + (lang === 'mk' ? 'Позиција' : 'Position') + '</th><th>' + (lang === 'mk' ? 'Потпис' : 'Signature') + '</th><th>' + (lang === 'mk' ? 'Датум' : 'Date') + '</th></tr></thead><tbody>';
+        for (var i = 0; i < attendees.length; i++) {
+            var email = attendees[i];
+            var user = null;
+            for (var j = 0; j < users.length; j++) {
+                if (users[j].email === email) { user = users[j]; break; }
+            }
+            var name = user ? user.name : email;
+            var position = user ? user.position : (lang === 'mk' ? 'Присутен' : 'Attendee');
+            signaturesHtml += `<tr><td>${escapeHtml(name)}</td><td>${escapeHtml(position)}</td><td style="text-align:center">_______________</td><td style="text-align:center">${formattedDate}</td></tr>`;
+        }
+        signaturesHtml += '</tbody></table></div>';
+        
+        printWindow.document.write(`<!DOCTYPE html>
+        <html><head><meta charset="UTF-8"><title>${escapeHtml(meeting.title_mk)} - Report</title>
+        <style>body{font-family:Calibri; margin:2rem;} .header{text-align:center;border-bottom:2px solid #003399;} .eu-logo{font-size:24px;font-weight:bold;color:#003399;}</style></head>
+        <body><div class="header"><div class="eu-logo">🇪🇺 NA-NAU 🇲🇰</div><h1>NA-NAU MEETING REPORT</h1></div>
+        <h2>${escapeHtml(meeting.title_mk)}</h2>
+        <p><strong>Date:</strong> ${meeting.date}<br><strong>Time:</strong> ${meeting.time}<br><strong>Location:</strong> ${escapeHtml(meeting.location)}<br><strong>Attendees:</strong> ${escapeHtml(meeting.attendees)}</p>
+        <h3>Agenda</h3><p>${escapeHtml(meeting.agenda_mk || '').replace(/\n/g,'<br>')}</p>
+        <h3>Minutes</h3><p>${escapeHtml(meeting.minutes_mk || '').replace(/\n/g,'<br>')}</p>
+        <h3>Decisions</h3><p>${escapeHtml(meeting.decisions_mk || '').replace(/\n/g,'<br>')}</p>
+        ${signaturesHtml}
+        <footer><p>Generated by NA-NAU · ${formattedDate}</p></footer></body></html>`);
         printWindow.document.close();
         printWindow.print();
+    }
+    
+    function viewMeeting(id) {
+        const meeting = meetings.find(m => m.id === id);
+        if (meeting) alert(`📌 ${meeting.title_mk}\n\n📅 ${meeting.date}\n📍 ${meeting.location}\n👥 ${meeting.attendees}\n\n📋 Дневен ред:\n${meeting.agenda_mk}`);
     }
     
     // ==================== КАЛЕНДАР ====================
@@ -634,19 +517,14 @@
         while (days.length < 42) days.push(null);
         
         let html = `<div class="card"><div class="month-nav"><button class="btn btn-sm" id="prevMonthBtn">◀</button><strong>${monthNames[calendarMonth]} ${calendarYear}</strong><button class="btn btn-sm" id="nextMonthBtn">▶</button></div><div class="calendar-grid">`;
-        for (var i = 0; i < weekDays.length; i++) {
-            html += `<div class="cal-day-header">${weekDays[i]}</div>`;
-        }
+        for (var i = 0; i < weekDays.length; i++) html += `<div class="cal-day-header">${weekDays[i]}</div>`;
         const today = new Date();
         for (var i = 0; i < days.length; i++) {
             var d = days[i];
-            if (d === null) {
-                html += `<div class="cal-day" style="opacity:0.3;"></div>`;
-                continue;
-            }
+            if (d === null) { html += `<div class="cal-day" style="opacity:0.3;"></div>`; continue; }
             const dateStr = `${calendarYear}-${String(calendarMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             const isToday = today.getDate() === d && today.getMonth() === calendarMonth && today.getFullYear() === calendarYear;
-            const dayMeetings = meetings.filter(function(m) { return !m.isArchived && m.date === dateStr; });
+            const dayMeetings = meetings.filter(m => !m.isArchived && m.date === dateStr);
             let events = "";
             for (var j = 0; j < dayMeetings.length; j++) {
                 var m = dayMeetings[j];
@@ -659,17 +537,11 @@
     }
     
     function openDatePicker(date) {
-        var createNew = confirm("Нема состаноци за овој датум. Дали сакате да креирате нов состанок за " + date + "?");
-        if (createNew) {
+        if (confirm("Нема состаноци за овој датум. Дали сакате да креирате нов?")) {
             document.getElementById("date").value = date;
             currentTab = "new";
             renderApp();
         }
-    }
-    
-    function viewMeeting(id) {
-        const meeting = meetings.find(m => m.id === id);
-        if (meeting) alert(`📌 ${meeting.title_mk}\n\n📅 ${meeting.date}\n📍 ${meeting.location}\n👥 ${meeting.attendees}\n\n📋 Дневен ред:\n${meeting.agenda_mk}\n\n📝 Записник:\n${meeting.minutes_mk}`);
     }
     
     // ==================== РЕНДЕРИРАЊЕ ====================
@@ -705,7 +577,7 @@
             html += `<div class="meeting-item" onclick="viewMeeting(${m.id})">
                 <div class="meeting-title" style="color:#64748b;">${escapeHtml(m.title_mk)} <span class="archived-badge">${t('archived')}</span></div>
                 <div class="meta">📅 ${m.date} | ⏰ ${m.time} | 📍 ${escapeHtml(m.location)} | 👥 ${escapeHtml(m.attendees || '')}</div>
-                <div style="font-size:0.7rem; color:#166534; margin-top:5px;">✅ ${t('archivedBy')}: ${escapeHtml(m.archivedByName || m.created_by_name)}</div>
+                <div style="font-size:0.7rem; color:#166534;">✅ ${t('archivedBy')}: ${escapeHtml(m.archivedByName || m.created_by_name)}</div>
                 <div class="action-group" onclick="event.stopPropagation()">
                     <button class="btn btn-primary btn-sm" onclick='exportWord(${JSON.stringify(m).replace(/'/g, "&#39;")})'>📄 ${t('export')}</button>
                     <button class="btn btn-sm" onclick='printMeeting(${JSON.stringify(m).replace(/'/g, "&#39;")})'>🖨️ ${t('print')}</button>`;
@@ -728,7 +600,7 @@
                 }
             }
         }
-        userNotifications.sort(function(a,b){ return new Date(b.date) - new Date(a.date); });
+        userNotifications.sort((a,b) => new Date(b.date) - new Date(a.date));
         if (userNotifications.length === 0) return `<div class="card"><div class="empty">${t('noNotifications')}</div></div>`;
         var html = `<div class="card"><div class="card-header"><span class="card-title">🔔 ${t('notifications')}</span></div>`;
         for (var i = 0; i < userNotifications.length; i++) {
@@ -765,23 +637,13 @@
         var html = `<div class="card"><div class="card-header"><span class="card-title">👥 ${t('employees')}</span></div>`;
         for (var i = 0; i < users.length; i++) {
             var u = users[i];
-            html += `<div class="employee-card">
-                <div><strong>${escapeHtml(u.name)}</strong><br><small>${escapeHtml(u.position)}</small><br><small>📧 ${escapeHtml(u.email)}</small><br>${u.isAdmin ? '👑 ' + t('isAdmin') : ''}</div>
-                <div>
-                    ${u.id !== currentUser.id ? `<button class="btn btn-warning btn-sm" onclick="resetUserPassword(${u.id})" style="margin-right:5px;">🔑 Лозинка</button>` : ''}
-                    ${u.id !== currentUser.id ? `<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">🗑️</button>` : ''}
-                </div>
-            </div>`;
+            html += `<div class="employee-card"><div><strong>${escapeHtml(u.name)}</strong><br><small>${escapeHtml(u.position)}</small><br><small>📧 ${escapeHtml(u.email)}</small><br>${u.isAdmin ? '👑 ' + t('isAdmin') : ''}</div>
+            <div>${u.id !== currentUser.id ? `<button class="btn btn-warning btn-sm" onclick="resetUserPassword(${u.id})" style="margin-right:5px;">🔑 Лозинка</button><button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">🗑️</button>` : ''}</div></div>`;
         }
         html += `</div>
-        <div class="add-user-section">
-            <div class="card-title" style="margin-bottom:15px;">➕ ${t('addUser')}</div>
-            <div class="grid-2">
-                <div class="fi"><label>${t('name')}</label><input id="newName" placeholder="Име"></div>
-                <div class="fi"><label>Email</label><input id="newEmail" placeholder="email@na.org.mk"></div>
-                <div class="fi"><label>${t('position')}</label><input id="newPos" placeholder="Функција"></div>
-                <div class="fi"><label>${t('password')}</label><input id="newPassword" placeholder="Лозинка" value="12345"></div>
-            </div>
+        <div class="add-user-section"><div class="card-title" style="margin-bottom:15px;">➕ ${t('addUser')}</div>
+            <div class="grid-2"><div><label>${t('name')}</label><input id="newName" placeholder="Име"></div><div><label>Email</label><input id="newEmail" placeholder="email@na.org.mk"></div>
+            <div><label>${t('position')}</label><input id="newPos" placeholder="Функција"></div><div><label>${t('password')}</label><input id="newPassword" placeholder="Лозинка" value="12345"></div></div>
             <div style="margin:10px 0;"><label><input type="checkbox" id="newIsAdmin"> 👑 ${t('isAdmin')}</label></div>
             <button class="btn btn-primary" onclick="addUser()">➕ ${t('addUser')}</button>
         </div>`;
@@ -852,23 +714,41 @@
                 ${renderMain()}
                 <div class="footer-credit">Created by: D. Dimitrov · NA-NAU</div></div>`;
             
-            var btns = document.querySelectorAll('[data-tab]');
-            for (var i = 0; i < btns.length; i++) {
-                btns[i].addEventListener('click', function(e) {
+            document.querySelectorAll('[data-tab]').forEach(btn => {
+                btn.addEventListener('click', function(e) {
                     var tabId = this.getAttribute('data-tab');
                     if (tabId === 'notifications') markNotificationsAsRead();
                     currentTab = tabId;
                     renderApp();
                 });
-            }
-            var prevBtn = document.getElementById("prevMonthBtn");
-            var nextBtn = document.getElementById("nextMonthBtn");
-            if (prevBtn) prevBtn.onclick = function() { calendarMonth--; if(calendarMonth<0){calendarMonth=11;calendarYear--;} renderApp(); };
-            if (nextBtn) nextBtn.onclick = function() { calendarMonth++; if(calendarMonth>11){calendarMonth=0;calendarYear++;} renderApp(); };
+            });
+            document.getElementById("prevMonthBtn")?.addEventListener("click", () => { calendarMonth--; if(calendarMonth<0){calendarMonth=11;calendarYear--;} renderApp(); });
+            document.getElementById("nextMonthBtn")?.addEventListener("click", () => { calendarMonth++; if(calendarMonth>11){calendarMonth=0;calendarYear++;} renderApp(); });
         }
     }
     
     function setLanguage(l) { lang = l; renderApp(); }
+    
+    // ==================== АВТЕНТИКАЦИЈА ====================
+    async function login(email, password) {
+        await loadUsersFromCloud();
+        for (var i = 0; i < users.length; i++) {
+            if (users[i].email === email && users[i].password === password) {
+                currentUser = users[i];
+                sessionStorage.setItem('na_nau_currentUser', JSON.stringify(currentUser));
+                await loadMeetingsFromCloud();
+                renderApp();
+                return { success: true };
+            }
+        }
+        return { success: false, error: "Погрешна е-пошта или лозинка" };
+    }
+    
+    function logout() { 
+        currentUser = null; 
+        sessionStorage.removeItem('na_nau_currentUser');
+        renderApp(); 
+    }
     
     window.viewMeeting = viewMeeting;
     window.doLogin = async function() {
@@ -877,10 +757,8 @@
         var result = await login(email, pwd);
         if (!result.success) {
             var errDiv = document.getElementById('loginError');
-            if (errDiv) {
-                errDiv.style.display = 'block';
-                errDiv.innerText = result.error;
-            }
+            if (errDiv) errDiv.style.display = 'block';
+            errDiv.innerText = result.error;
         }
     };
     window.editMeeting = editMeeting;
