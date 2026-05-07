@@ -1,689 +1,139 @@
 <!DOCTYPE html>
-<html lang="mk">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NA-NAU Meeting Management</title>
+<title>Meeting System</title>
 
 <style>
 
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
-}
-
 body{
-font-family:Segoe UI,sans-serif;
-background:#f1f5f9;
-color:#0f172a;
-}
-
-.app{
-max-width:1400px;
-margin:auto;
+font-family:Segoe UI;
+background:#f4f6fb;
+margin:0;
 padding:20px;
-}
-
-.header{
-background:white;
-padding:20px;
-border-radius:16px;
-display:flex;
-justify-content:space-between;
-align-items:center;
-margin-bottom:20px;
-box-shadow:0 2px 10px rgba(0,0,0,0.08);
-flex-wrap:wrap;
-gap:15px;
-}
-
-.logo{
-font-size:24px;
-font-weight:700;
-color:#003399;
-}
-
-.user-box{
-display:flex;
-gap:10px;
-align-items:center;
-flex-wrap:wrap;
-}
-
-.tabs{
-display:flex;
-gap:10px;
-margin-bottom:20px;
-flex-wrap:wrap;
-}
-
-.tab{
-padding:10px 18px;
-border:none;
-border-radius:30px;
-background:white;
-cursor:pointer;
-font-weight:600;
-}
-
-.tab.active{
-background:#003399;
-color:white;
 }
 
 .card{
 background:white;
 padding:20px;
-border-radius:16px;
+border-radius:12px;
 margin-bottom:15px;
-box-shadow:0 2px 10px rgba(0,0,0,0.06);
+box-shadow:0 2px 10px rgba(0,0,0,0.08);
 }
 
 .btn{
-padding:8px 14px;
+padding:8px 12px;
 border:none;
 border-radius:8px;
 cursor:pointer;
-font-weight:600;
+margin-right:5px;
 }
 
-.btn-primary{
-background:#003399;
-color:white;
-}
-
-.btn-danger{
-background:#dc2626;
-color:white;
-}
-
-.btn-warning{
-background:#f59e0b;
-color:white;
-}
+.primary{background:#003399;color:white;}
+.danger{background:#d11a2a;color:white;}
+.warning{background:#f59e0b;color:white;}
 
 input,textarea{
 width:100%;
 padding:10px;
-border:1px solid #cbd5e1;
+margin:5px 0;
+border:1px solid #ccc;
 border-radius:8px;
-margin-top:5px;
-margin-bottom:12px;
 }
 
-textarea{
-min-height:90px;
-resize:vertical;
-}
-
-.grid{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:15px;
-}
-
-.meeting{
-padding:15px;
-border:1px solid #e2e8f0;
-border-radius:12px;
-margin-bottom:10px;
-}
-
-.actions{
-display:flex;
-gap:8px;
-margin-top:10px;
-flex-wrap:wrap;
-}
-
-.login{
-max-width:450px;
-margin:80px auto;
-background:white;
-padding:30px;
-border-radius:20px;
-box-shadow:0 5px 20px rgba(0,0,0,0.1);
-}
-
-.calendar{
-display:grid;
-grid-template-columns:repeat(7,1fr);
-gap:8px;
-}
-
-.day{
-background:white;
-border:1px solid #cbd5e1;
-border-radius:10px;
-min-height:100px;
-padding:8px;
-}
-
-.event{
-background:#dbeafe;
-padding:4px;
-border-radius:6px;
-font-size:12px;
-margin-top:4px;
-}
-
-.employee{
+.header{
 display:flex;
 justify-content:space-between;
 align-items:center;
-padding:12px;
-border:1px solid #e2e8f0;
-border-radius:10px;
+margin-bottom:15px;
+}
+
+.meeting{
+border-left:4px solid #003399;
+padding:10px;
 margin-bottom:10px;
-flex-wrap:wrap;
-gap:10px;
+background:#fff;
 }
 
-@media(max-width:700px){
-
-.grid{
-grid-template-columns:1fr;
-}
-
-.calendar{
-grid-template-columns:repeat(2,1fr);
-}
-
+.lang button{
+margin-left:5px;
 }
 
 </style>
+
 </head>
 
 <body>
+
+<div class="header">
+<h2>Meeting System</h2>
+
+<div class="lang">
+<button onclick="lang='mk';render()">MK</button>
+<button onclick="lang='en';render()">EN</button>
+</div>
+
+</div>
 
 <div id="app"></div>
 
 <script>
 
-const API_URL = "https://script.google.com/macros/s/AKfycbz2OrrV6QUJOl7CBtyW8KZ2WZJeEr3SYk3xOSm58VYeeVU1fR56eY6BDGNdcg1akA0Z/exec";
+const API = "https://script.google.com/macros/s/AKfycbykp4Wp9dt1ChN6qFcgPyuOJv0d6uG4bLFyfcKvPaQ39CS_Vg_Sa-YPBbWywQlq-1dU/exec";
 
-let currentUser = null;
 let meetings = [];
 let users = [];
-let currentTab = "meetings";
-let editId = null;
+let currentUser = null;
+let lang = "mk";
 
-async function apiGet(action){
-
-const res = await fetch(API_URL + "?action=" + action);
-
-return await res.json();
-
+// =========================
+async function get(a){
+  const r = await fetch(API+"?action="+a);
+  return await r.json();
 }
 
-async function apiPost(action,data){
-
-await fetch(API_URL + "?action=" + action,{
-method:"POST",
-headers:{
-"Content-Type":"application/json"
-},
-body:JSON.stringify(data)
-});
-
-return true;
-
+async function post(d){
+  await fetch(API,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(d)
+  });
 }
 
-async function loadMeetings(){
-
-const data = await apiGet("getMeetings");
-
-meetings = data.meetings || [];
-
-render();
-
-}
-
-async function loadUsers(){
-
-const data = await apiGet("getUsers");
-
-users = data.users || [];
-
-}
-
+// ========================= LOGIN
 async function login(){
 
-const email = document.getElementById("email").value.trim().toLowerCase();
-const password = document.getElementById("password").value.trim();
+users = (await get("getUsers")).users || [];
 
-await loadUsers();
+const email = prompt("email");
+const pass = prompt("password");
 
-const user = users.find(u =>
-String(u.email).toLowerCase() === email &&
-String(u.password) === password
+currentUser = users.find(u =>
+  (u.email||"").toLowerCase()===email.toLowerCase()
+  && u.password===pass
 );
 
-if(!user){
+if(!currentUser){
+  alert("Wrong credentials");
+  return;
+}
 
-alert("Wrong credentials");
-
-return;
+load();
 
 }
 
-currentUser = user;
+// ========================= LOAD
+async function load(){
 
-await loadMeetings();
+meetings = (await get("getMeetings")).meetings || [];
 
 render();
 
 }
 
-function logout(){
-
-currentUser = null;
-
-render();
-
-}
-
-async function saveMeeting(){
-
-const meeting = {
-id: editId || Date.now(),
-title_mk: document.getElementById("title").value,
-date: document.getElementById("date").value,
-time: document.getElementById("time").value,
-location: document.getElementById("location").value,
-attendees: document.getElementById("attendees").value,
-agenda_mk: document.getElementById("agenda").value,
-minutes_mk: document.getElementById("minutes").value,
-decisions_mk: document.getElementById("decisions").value,
-archived:false
-};
-
-await apiPost("saveMeeting",meeting);
-
-editId = null;
-
-await loadMeetings();
-
-currentTab = "meetings";
-
-render();
-
-}
-
-function editMeeting(id){
-
-const m = meetings.find(x=>String(x.id)===String(id));
-
-editId = m.id;
-
-currentTab = "new";
-
-render();
-
-setTimeout(()=>{
-
-document.getElementById("title").value = m.title_mk || "";
-document.getElementById("date").value = m.date || "";
-document.getElementById("time").value = m.time || "";
-document.getElementById("location").value = m.location || "";
-document.getElementById("attendees").value = m.attendees || "";
-document.getElementById("agenda").value = m.agenda_mk || "";
-document.getElementById("minutes").value = m.minutes_mk || "";
-document.getElementById("decisions").value = m.decisions_mk || "";
-
-},100);
-
-}
-
-async function deleteMeeting(id){
-
-if(!confirm("Delete?")) return;
-
-await apiPost("deleteMeeting",{id:id});
-
-await loadMeetings();
-
-}
-
-async function archiveMeeting(id){
-
-const m = meetings.find(x=>String(x.id)===String(id));
-
-m.archived = true;
-
-await apiPost("saveMeeting",m);
-
-await loadMeetings();
-
-}
-
-function exportWord(id){
-
-const m = meetings.find(x=>String(x.id)===String(id));
-
-const html = `
-<h1>${m.title_mk}</h1>
-<p>Date: ${m.date}</p>
-<p>Time: ${m.time}</p>
-<p>Location: ${m.location}</p>
-<p>Attendees: ${m.attendees}</p>
-<h2>Agenda</h2>
-<p>${m.agenda_mk}</p>
-<h2>Minutes</h2>
-<p>${m.minutes_mk}</p>
-<h2>Decisions</h2>
-<p>${m.decisions_mk}</p>
-`;
-
-const blob = new Blob([html],{
-type:"application/msword"
-});
-
-const a = document.createElement("a");
-
-a.href = URL.createObjectURL(blob);
-
-a.download = "meeting.doc";
-
-a.click();
-
-}
-
-function printMeeting(id){
-
-const m = meetings.find(x=>String(x.id)===String(id));
-
-const w = window.open("");
-
-w.document.write(`
-<h1>${m.title_mk}</h1>
-<p>${m.date}</p>
-<p>${m.location}</p>
-<p>${m.agenda_mk}</p>
-`);
-
-w.print();
-
-}
-
-async function addUser(){
-
-const user = {
-id: Date.now(),
-name: document.getElementById("uName").value,
-position: document.getElementById("uPosition").value,
-email: document.getElementById("uEmail").value,
-password: document.getElementById("uPassword").value,
-isAdmin: document.getElementById("uAdmin").checked
-};
-
-await apiPost("saveUser",user);
-
-await loadUsers();
-
-render();
-
-}
-
-async function deleteUser(id){
-
-await apiPost("deleteUser",{id:id});
-
-await loadUsers();
-
-render();
-
-}
-
-async function resetPassword(id){
-
-const pass = prompt("New password");
-
-if(!pass) return;
-
-const u = users.find(x=>String(x.id)===String(id));
-
-u.password = pass;
-
-await apiPost("saveUser",u);
-
-await loadUsers();
-
-render();
-
-}
-
-function renderLogin(){
-
-return `
-<div class="login">
-<h1>NA-NAU Login</h1>
-
-<input id="email" placeholder="Email">
-
-<input type="password" id="password" placeholder="Password">
-
-<button class="btn btn-primary" onclick="login()">
-Login
-</button>
-
-</div>
-`;
-
-}
-
-function renderMeetings(){
-
-return `
-<div class="card">
-
-<h2>Meetings</h2>
-
-${meetings.filter(m=>!m.archived).map(m=>`
-
-<div class="meeting">
-
-<h3>${m.title_mk}</h3>
-
-<p>
-📅 ${m.date}
-⏰ ${m.time}
-</p>
-
-<p>📍 ${m.location}</p>
-
-<div class="actions">
-
-<button class="btn btn-primary"
-onclick="editMeeting('${m.id}')">
-Edit
-</button>
-
-<button class="btn btn-warning"
-onclick="archiveMeeting('${m.id}')">
-Archive
-</button>
-
-<button class="btn btn-danger"
-onclick="deleteMeeting('${m.id}')">
-Delete
-</button>
-
-<button class="btn"
-onclick="exportWord('${m.id}')">
-Word
-</button>
-
-<button class="btn"
-onclick="printMeeting('${m.id}')">
-Print
-</button>
-
-</div>
-
-</div>
-
-`).join("")}
-
-</div>
-`;
-
-}
-
-function renderForm(){
-
-return `
-<div class="card">
-
-<h2>Meeting Form</h2>
-
-<input id="title" placeholder="Title">
-
-<div class="grid">
-
-<div>
-<label>Date</label>
-<input type="date" id="date">
-</div>
-
-<div>
-<label>Time</label>
-<input type="time" id="time">
-</div>
-
-</div>
-
-<input id="location" placeholder="Location">
-
-<input id="attendees" placeholder="Attendees">
-
-<textarea id="agenda" placeholder="Agenda"></textarea>
-
-<textarea id="minutes" placeholder="Minutes"></textarea>
-
-<textarea id="decisions" placeholder="Decisions"></textarea>
-
-<button class="btn btn-primary"
-onclick="saveMeeting()">
-Save
-</button>
-
-</div>
-`;
-
-}
-
-function renderEmployees(){
-
-return `
-<div class="card">
-
-<h2>Employees</h2>
-
-${users.map(u=>`
-
-<div class="employee">
-
-<div>
-<strong>${u.name}</strong><br>
-${u.position}<br>
-${u.email}
-</div>
-
-<div class="actions">
-
-<button class="btn btn-warning"
-onclick="resetPassword('${u.id}')">
-Password
-</button>
-
-<button class="btn btn-danger"
-onclick="deleteUser('${u.id}')">
-Delete
-</button>
-
-</div>
-
-</div>
-
-`).join("")}
-
-<hr><br>
-
-<h3>Add User</h3>
-
-<input id="uName" placeholder="Name">
-
-<input id="uPosition" placeholder="Position">
-
-<input id="uEmail" placeholder="Email">
-
-<input id="uPassword" placeholder="Password">
-
-<label>
-<input type="checkbox" id="uAdmin">
-Admin
-</label>
-
-<br><br>
-
-<button class="btn btn-primary"
-onclick="addUser()">
-Add User
-</button>
-
-</div>
-`;
-
-}
-
-function renderCalendar(){
-
-const days = [];
-
-for(let i=1;i<=31;i++){
-
-const date =
-new Date().getFullYear()
-+ "-"
-+ String(new Date().getMonth()+1).padStart(2,"0")
-+ "-"
-+ String(i).padStart(2,"0");
-
-const ms = meetings.filter(m=>m.date===date);
-
-days.push(`
-<div class="day">
-
-<strong>${i}</strong>
-
-${ms.map(m=>`
-<div class="event">
-${m.title_mk}
-</div>
-`).join("")}
-
-</div>
-`);
-
-}
-
-return `
-<div class="card">
-
-<h2>Calendar</h2>
-
-<div class="calendar">
-
-${days.join("")}
-
-</div>
-
-</div>
-`;
-
+// ========================= RENDER
+function t(mk,en){
+  return lang==="mk"?mk:en;
 }
 
 function render(){
@@ -691,70 +141,78 @@ function render(){
 const app = document.getElementById("app");
 
 if(!currentUser){
-
-app.innerHTML = renderLogin();
-
+app.innerHTML = `<button onclick="login()">Login</button>`;
 return;
-
 }
 
 app.innerHTML = `
-<div class="app">
 
-<div class="header">
+<div class="card">
+<h3>${t("Состаноци","Meetings")}</h3>
 
-<div class="logo">
-NA-NAU Meeting Management
-</div>
+${meetings.map(m=>`
 
-<div class="user-box">
+<div class="meeting">
 
-${currentUser.name}
+<h3>${lang==="mk"?m.title_mk:m.title_en}</h3>
 
-<button class="btn btn-danger"
-onclick="logout()">
-Logout
-</button>
+<p>${m.date} ${m.time}</p>
+<p>${m.location}</p>
 
-</div>
+<p style="color:gray">
+${lang==="mk"?m.agenda_mk:m.agenda_en}
+</p>
 
-</div>
-
-<div class="tabs">
-
-<button class="tab ${currentTab==="meetings"?"active":""}"
-onclick="currentTab='meetings';render();">
-Meetings
-</button>
-
-<button class="tab ${currentTab==="new"?"active":""}"
-onclick="currentTab='new';render();">
-New Meeting
-</button>
-
-<button class="tab ${currentTab==="calendar"?"active":""}"
-onclick="currentTab='calendar';render();">
-Calendar
-</button>
-
-<button class="tab ${currentTab==="employees"?"active":""}"
-onclick="currentTab='employees';render();">
-Employees
-</button>
+<button class="btn primary" onclick="exportWord(${m.id})">Word</button>
+<button class="btn danger" onclick="del(${m.id})">${t("Избриши","Delete")}</button>
 
 </div>
 
-${currentTab==="meetings" ? renderMeetings() : ""}
-${currentTab==="new" ? renderForm() : ""}
-${currentTab==="calendar" ? renderCalendar() : ""}
-${currentTab==="employees" ? renderEmployees() : ""}
+`).join("")}
 
 </div>
+
 `;
 
 }
 
-render();
+// ========================= DELETE
+async function del(id){
+await post({action:"deleteMeeting",id});
+load();
+}
+
+// ========================= SAVE (demo)
+async function saveDemo(){
+await post({
+action:"saveMeeting",
+id:Date.now(),
+title_mk:"Состанок",
+title_en:"Meeting",
+date:"2026-01-01",
+time:"10:00",
+createdBy: currentUser.name
+});
+load();
+}
+
+// ========================= WORD
+function exportWord(id){
+
+const m = meetings.find(x=>String(x.id)==String(id));
+
+const html = `
+<h1>${m.title_mk} / ${m.title_en}</h1>
+<p>Created by D.Dimitrov</p>
+`;
+
+const blob = new Blob([html],{type:"application/msword"});
+const a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="report.doc";
+a.click();
+
+}
 
 </script>
 
