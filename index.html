@@ -24,10 +24,11 @@
         .lang-btn { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 20px; cursor: pointer; font-size: 0.7rem; }
         .lang-btn.active { background: #003399; color: white; border-color: #003399; }
         
-        .tabs { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; border-bottom: 2px solid #cbd5e1; padding-bottom: 4px; }
-        .tab { padding: 8px 20px; border-radius: 30px; background: transparent; border: none; color: #64748b; font-weight: 600; cursor: pointer; }
+        .tabs { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; border-bottom: 2px solid #cbd5e1; padding-bottom: 4px; position: relative; }
+        .tab { padding: 8px 20px; border-radius: 30px; background: transparent; border: none; color: #64748b; font-weight: 600; cursor: pointer; position: relative; }
         .tab:hover { background: #eef2f6; }
         .tab.active { background: #003399; color: white; }
+        .notification-dot { position: absolute; top: -5px; right: 5px; width: 12px; height: 12px; background-color: #ef4444; border-radius: 50%; border: 2px solid white; }
         
         .card { background: white; border-radius: 1rem; padding: 1.25rem 1.5rem; margin-bottom: 1rem; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 2px solid #eef2f6; flex-wrap: wrap; gap: 10px; }
@@ -61,6 +62,7 @@
         .footer-credit { text-align: center; margin-top: 2rem; padding: 1rem; font-size: 0.7rem; color: #64748b; border-top: 1px solid #e2e8f0; }
         .employee-card { background: #f8fafc; border-radius: 12px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .archived-badge { background: #e2e8f0; color: #475569; padding: 2px 8px; border-radius: 20px; font-size: 0.65rem; }
+        .add-user-section { background: #dbeafe; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
         @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -69,24 +71,75 @@
 
 <script>
     // ==================== КОНФИГУРАЦИЈА ====================
-    const API_URL = "https://script.google.com/macros/s/TVOJOT_URL_OVDE/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbx5Q8xJHO3qbT5Ebc47iX2sN3K0oUzIeY2MemUO62hF0X9DbeUqUIQw3t9K438yeQrZ/exec";
     
     // ЛОКАЛНИ КОРИСНИЦИ
-    const USERS = [
+    let users = [
         { id: 1, name: "Дарко Димитров", position: "Раководител на сектор", email: "darko.dimitrov@na.org.mk", password: "12345", isAdmin: true },
         { id: 2, name: "Ана Митровска", position: "Директор", email: "ana.mihajlov@na.org.mk", password: "abcd", isAdmin: false }
     ];
     
-    // ГЛОБАЛНИ ПРОМЕНЛИВИ
     let meetings = [
-        { id: 1, title_mk: "Кик-офф состанок", title_en: "Kick-off meeting", date: "2026-05-15", time: "10:00", location: "Голема сала", attendees: "darko.dimitrov@na.org.mk, ana.mihajlov@na.org.mk", agenda_mk: "1. Отворање\n2. План", agenda_en: "", minutes_mk: "Договорени чекори", minutes_en: "", decisions_mk: "Започнуваме", decisions_en: "", isArchived: false, notifications: [{ message: "Состанокот е креиран", date: new Date().toISOString() }], created_by: 1, created_by_name: "Дарко Димитров" }
+        { id: 1, title_mk: "Кик-офф состанок", title_en: "Kick-off meeting", date: "2026-05-15", time: "10:00", location: "Голема сала", attendees: "darko.dimitrov@na.org.mk, ana.mihajlov@na.org.mk", agenda_mk: "1. Отворање\n2. План", agenda_en: "", minutes_mk: "Договорени чекори", minutes_en: "", decisions_mk: "Започнуваме", decisions_en: "", isArchived: false, notifications: [{ message: "Состанокот е креиран", date: new Date().toISOString(), read: false }], created_by: 1, created_by_name: "Дарко Димитров" }
     ];
+    
     let currentUser = null;
     let currentTab = "meetings";
     let lang = "mk";
     let editMeetingId = null;
+    let unreadNotifications = false;
+    let beepSound = null;
     
-    // ПРЕВОДИ
+    // Иницијализација на звук
+    try {
+        beepSound = new Audio('data:audio/wav;base64,U3RlYWx0aCBzb3VuZA==');
+        if (!beepSound) beepSound = null;
+    } catch(e) { beepSound = null; }
+    
+    function playNotificationSound() {
+        if (beepSound) {
+            beepSound.play().catch(function(e) { console.log("Sound play failed:", e); });
+        }
+    }
+    
+    function checkUnreadNotifications() {
+        for (var i = 0; i < meetings.length; i++) {
+            var m = meetings[i];
+            if (m.notifications && m.notifications.length) {
+                for (var j = 0; j < m.notifications.length; j++) {
+                    if (m.notifications[j].read !== true) {
+                        unreadNotifications = true;
+                        return true;
+                    }
+                }
+            }
+        }
+        unreadNotifications = false;
+        return false;
+    }
+    
+    function markNotificationsAsRead() {
+        for (var i = 0; i < meetings.length; i++) {
+            var m = meetings[i];
+            if (m.notifications && m.notifications.length) {
+                for (var j = 0; j < m.notifications.length; j++) {
+                    m.notifications[j].read = true;
+                }
+            }
+        }
+        unreadNotifications = false;
+        renderApp();
+    }
+    
+    function addNotification(meeting, message) {
+        if (!meeting.notifications) meeting.notifications = [];
+        meeting.notifications.unshift({ message: message, date: new Date().toISOString(), read: false });
+        unreadNotifications = true;
+        playNotificationSound();
+        saveMeetingToLocal(meeting);
+        renderApp();
+    }
+    
     const translations = {
         mk: { 
             meetings: "Состаноци", newMeeting: "Нов состанок", archive: "Архива", notifications: "Нотификации", employees: "Вработени",
@@ -95,7 +148,7 @@
             agenda: "Дневен ред", minutes: "Записник", decisions: "Заклучоци", save: "Зачувај", cancel: "Откажи",
             edit: "Уреди", delete: "Избриши", archiveBtn: "Архивирај", export: "Извештај", print: "Печати",
             noActive: "Нема активни состаноци.", noArchive: "Нема архивирани состаноци.", noNotifications: "Нема нотификации.",
-            archivedBy: "Архивиран од", archived: "Архивиран"
+            archivedBy: "Архивиран од", archived: "Архивиран", addUser: "Додади вработен", name: "Име", position: "Функција", isAdmin: "Администратор", password: "Лозинка"
         },
         en: { 
             meetings: "Meetings", newMeeting: "New Meeting", archive: "Archive", notifications: "Notifications", employees: "Employees",
@@ -104,14 +157,27 @@
             agenda: "Agenda", minutes: "Minutes", decisions: "Decisions", save: "Save", cancel: "Cancel",
             edit: "Edit", delete: "Delete", archiveBtn: "Archive", export: "Report", print: "Print",
             noActive: "No active meetings.", noArchive: "No archived meetings.", noNotifications: "No notifications.",
-            archivedBy: "Archived by", archived: "Archived"
+            archivedBy: "Archived by", archived: "Archived", addUser: "Add employee", name: "Name", position: "Position", isAdmin: "Administrator", password: "Password"
         }
     };
     
     function t(key) { return translations[lang][key] || key; }
     function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
     
-    // ==================== ФУНКЦИИ ЗА СОСТАНОЦИ ====================
+    // ==================== ФУНКЦИИ ЗА ЧУВАЊЕ ====================
+    function saveUsersToLocal() {
+        localStorage.setItem('na_nau_users', JSON.stringify(users));
+    }
+    
+    function loadUsersFromLocal() {
+        var saved = localStorage.getItem('na_nau_users');
+        if (saved) {
+            try {
+                users = JSON.parse(saved);
+            } catch(e) {}
+        }
+    }
+    
     function saveMeetingToLocal(m) {
         const index = meetings.findIndex(x => x.id === m.id);
         if (index === -1) {
@@ -120,14 +186,96 @@
         } else {
             meetings[index] = m;
         }
+        saveAllMeetingsToLocal();
+        checkUnreadNotifications();
         renderApp();
+    }
+    
+    function saveAllMeetingsToLocal() {
+        localStorage.setItem('na_nau_meetings', JSON.stringify(meetings));
+    }
+    
+    function loadMeetingsFromLocal() {
+        var saved = localStorage.getItem('na_nau_meetings');
+        if (saved) {
+            try {
+                meetings = JSON.parse(saved);
+            } catch(e) {}
+        }
+        checkUnreadNotifications();
     }
     
     function deleteMeetingFromLocal(id) {
         meetings = meetings.filter(m => m.id !== id);
+        saveAllMeetingsToLocal();
+        checkUnreadNotifications();
         renderApp();
     }
     
+    loadUsersFromLocal();
+    loadMeetingsFromLocal();
+    
+    // ==================== КОРИСНИЦИ (АДМИН ФУНКЦИИ) ====================
+    function addUser() {
+        if (!currentUser.isAdmin) return;
+        var nameEl = document.getElementById("newName");
+        var emailEl = document.getElementById("newEmail");
+        var posEl = document.getElementById("newPos");
+        var passEl = document.getElementById("newPassword");
+        var isAdminEl = document.getElementById("newIsAdmin");
+        
+        var name = nameEl ? nameEl.value.trim() : "";
+        var email = emailEl ? emailEl.value.trim() : "";
+        var position = posEl ? posEl.value.trim() : "";
+        var password = passEl ? passEl.value : "12345";
+        var isAdmin = isAdminEl ? isAdminEl.checked : false;
+        
+        if (!name || !email) { alert("Внесете име и е-пошта!"); return; }
+        for (var i = 0; i < users.length; i++) {
+            if (users[i].email === email) { alert("Веќе постои корисник со оваа е-пошта!"); return; }
+        }
+        var newId = Math.max(...users.map(u => u.id), 0) + 1;
+        users.push({ id: newId, name: name, email: email, position: position || "Службеник", password: password, isAdmin: isAdmin });
+        saveUsersToLocal();
+        if (nameEl) nameEl.value = '';
+        if (emailEl) emailEl.value = '';
+        if (posEl) posEl.value = '';
+        if (passEl) passEl.value = '';
+        if (isAdminEl) isAdminEl.checked = false;
+        renderApp();
+        alert("✅ Вработениот е додаден!");
+    }
+    
+    function deleteUser(userId) {
+        if (!currentUser.isAdmin) return;
+        if (userId === currentUser.id) { alert("Не можете да се избришете себеси!"); return; }
+        if (confirm("Избриши го вработениот?")) {
+            users = users.filter(function(u) { return u.id !== userId; });
+            saveUsersToLocal();
+            renderApp();
+            alert("✅ Вработениот е избришан!");
+        }
+    }
+    
+    function resetUserPassword(userId) {
+        if (!currentUser.isAdmin) return;
+        var newPassword = prompt("Внесете нова лозинка за корисникот:");
+        if (!newPassword || newPassword.length < 3) {
+            alert("Лозинката мора да има барем 3 карактери!");
+            return;
+        }
+        for (var i = 0; i < users.length; i++) {
+            if (users[i].id === userId) {
+                users[i].password = newPassword;
+                break;
+            }
+        }
+        saveUsersToLocal();
+        renderApp();
+        alert("✅ Лозинката е променета!");
+    }
+    
+    // ==================== ФУНКЦИИ ЗА СОСТАНОЦИ ====================
     function createMeeting() {
         const title = document.getElementById("title_mk")?.value;
         if (!title) { alert("Внесете наслов!"); return; }
@@ -138,7 +286,7 @@
             agenda_mk: document.getElementById("agenda_mk")?.value || "", agenda_en: document.getElementById("agenda_en")?.value || "",
             minutes_mk: document.getElementById("minutes_mk")?.value || "", minutes_en: document.getElementById("minutes_en")?.value || "",
             decisions_mk: document.getElementById("decisions_mk")?.value || "", decisions_en: document.getElementById("decisions_en")?.value || "",
-            isArchived: false, notifications: [{ message: currentUser.name + " го создаде состанокот", date: new Date().toISOString() }],
+            isArchived: false, notifications: [{ message: currentUser.name + " го создаде состанокот", date: new Date().toISOString(), read: false }],
             created_by: currentUser.id, created_by_name: currentUser.name
         };
         saveMeetingToLocal(newMeeting);
@@ -178,7 +326,7 @@
             agenda_mk: document.getElementById("agenda_mk")?.value || "", agenda_en: document.getElementById("agenda_en")?.value || "",
             minutes_mk: document.getElementById("minutes_mk")?.value || "", minutes_en: document.getElementById("minutes_en")?.value || "",
             decisions_mk: document.getElementById("decisions_mk")?.value || "", decisions_en: document.getElementById("decisions_en")?.value || "",
-            notifications: [...(existing?.notifications || []), { message: currentUser.name + " го уреди состанокот", date: new Date().toISOString() }]
+            notifications: [...(existing?.notifications || []), { message: currentUser.name + " го уреди состанокот", date: new Date().toISOString(), read: false }]
         };
         saveMeetingToLocal(updatedMeeting);
         currentTab = "meetings";
@@ -190,7 +338,7 @@
         if (!currentUser.isAdmin) { alert("Само администратор може да архивира!"); return; }
         const updatedMeeting = {
             ...meeting, isArchived: true, archivedByName: currentUser.name, archivedDate: new Date().toISOString(),
-            notifications: [...(meeting.notifications || []), { message: currentUser.name + " го архивира состанокот", date: new Date().toISOString() }]
+            notifications: [...(meeting.notifications || []), { message: currentUser.name + " го архивира состанокот", date: new Date().toISOString(), read: false }]
         };
         saveMeetingToLocal(updatedMeeting);
         renderApp();
@@ -205,9 +353,9 @@
     
     // ==================== АВТЕНТИКАЦИЈА ====================
     function login(email, password) {
-        for (var i = 0; i < USERS.length; i++) {
-            if (USERS[i].email === email && USERS[i].password === password) {
-                currentUser = USERS[i];
+        for (var i = 0; i < users.length; i++) {
+            if (users[i].email === email && users[i].password === password) {
+                currentUser = users[i];
                 renderApp();
                 return { success: true };
             }
@@ -296,7 +444,7 @@
             var m = meetings[i];
             if (m.notifications && m.notifications.length) {
                 for (var j = 0; j < m.notifications.length; j++) {
-                    userNotifications.push({ meetingTitle: m.title_mk, meetingId: m.id, message: m.notifications[j].message, date: m.notifications[j].date });
+                    userNotifications.push({ meetingTitle: m.title_mk, meetingId: m.id, message: m.notifications[j].message, date: m.notifications[j].date, read: m.notifications[j].read });
                 }
             }
         }
@@ -305,7 +453,9 @@
         var html = `<div class="card"><div class="card-header"><span class="card-title">🔔 ${t('notifications')}</span></div>`;
         for (var i = 0; i < userNotifications.length; i++) {
             var n = userNotifications[i];
-            html += `<div class="notification-item" onclick="viewMeeting(${n.meetingId})">📌 <strong>${escapeHtml(n.meetingTitle)}</strong><br>📝 ${escapeHtml(n.message)}<br><small>${new Date(n.date).toLocaleString()}</small></div>`;
+            html += `<div class="notification-item" onclick="viewMeeting(${n.meetingId})" style="${!n.read ? 'background:#e6f0ff;' : ''}">
+                📌 <strong>${escapeHtml(n.meetingTitle)}</strong><br>📝 ${escapeHtml(n.message)}<br><small>${new Date(n.date).toLocaleString()}</small>
+            </div>`;
         }
         html += `</div>`;
         return html;
@@ -333,11 +483,28 @@
     function renderEmployees() {
         if (!currentUser.isAdmin) return `<div class="card"><div class="empty">⛔ ${lang === 'mk' ? 'Само администратор.' : 'Admin only.'}</div></div>`;
         var html = `<div class="card"><div class="card-header"><span class="card-title">👥 ${t('employees')}</span></div>`;
-        for (var i = 0; i < USERS.length; i++) {
-            var u = USERS[i];
-            html += `<div class="employee-card"><div><strong>${escapeHtml(u.name)}</strong><br><small>${escapeHtml(u.position)}</small><br><small>📧 ${escapeHtml(u.email)}</small><br>${u.isAdmin ? '👑 ' + t('isAdmin') : ''}</div></div>`;
+        for (var i = 0; i < users.length; i++) {
+            var u = users[i];
+            html += `<div class="employee-card">
+                <div><strong>${escapeHtml(u.name)}</strong><br><small>${escapeHtml(u.position)}</small><br><small>📧 ${escapeHtml(u.email)}</small><br>${u.isAdmin ? '👑 ' + t('isAdmin') : ''}</div>
+                <div>
+                    ${u.id !== currentUser.id ? `<button class="btn btn-warning btn-sm" onclick="resetUserPassword(${u.id})" style="margin-right:5px;">🔑 Лозинка</button>` : ''}
+                    ${u.id !== currentUser.id ? `<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">🗑️</button>` : ''}
+                </div>
+            </div>`;
         }
-        html += `</div>`;
+        html += `</div>
+        <div class="add-user-section">
+            <div class="card-title" style="margin-bottom:15px;">➕ ${t('addUser')}</div>
+            <div class="grid-2">
+                <div class="fi"><label>${t('name')}</label><input id="newName" placeholder="Име"></div>
+                <div class="fi"><label>Email</label><input id="newEmail" placeholder="email@na.org.mk"></div>
+                <div class="fi"><label>${t('position')}</label><input id="newPos" placeholder="Функција"></div>
+                <div class="fi"><label>${t('password')}</label><input id="newPassword" placeholder="Лозинка" value="12345"></div>
+            </div>
+            <div style="margin:10px 0;"><label><input type="checkbox" id="newIsAdmin"> 👑 ${t('isAdmin')}</label></div>
+            <button class="btn btn-primary" onclick="addUser()">➕ ${t('addUser')}</button>
+        </div>`;
         return html;
     }
     
@@ -353,7 +520,10 @@
         var tabsHtml = `<div class="tabs">`;
         for (var i = 0; i < tabsList.length; i++) {
             var tab = tabsList[i];
-            tabsHtml += `<button class="tab ${currentTab === tab.id ? 'active' : ''}" data-tab="${tab.id}">${tab.label}</button>`;
+            var hasDot = (tab.id === "notifications" && unreadNotifications);
+            tabsHtml += `<button class="tab ${currentTab === tab.id ? 'active' : ''}" data-tab="${tab.id}" onclick="if('${tab.id}' === 'notifications') markNotificationsAsRead();">
+                ${tab.label} ${hasDot ? '<span class="notification-dot"></span>' : ''}
+            </button>`;
         }
         tabsHtml += `</div>`;
         
@@ -403,7 +573,9 @@
             var btns = document.querySelectorAll('[data-tab]');
             for (var i = 0; i < btns.length; i++) {
                 btns[i].addEventListener('click', function(e) {
-                    currentTab = this.getAttribute('data-tab');
+                    var tabId = this.getAttribute('data-tab');
+                    if (tabId === 'notifications') markNotificationsAsRead();
+                    currentTab = tabId;
                     renderApp();
                 });
             }
@@ -434,9 +606,11 @@
     window.exportWord = exportWord;
     window.printMeeting = printMeeting;
     window.cancelForm = cancelForm;
+    window.addUser = addUser;
+    window.deleteUser = deleteUser;
+    window.resetUserPassword = resetUserPassword;
     window.setLanguage = setLanguage;
     
-    // Старт
     renderApp();
 </script>
 </body>
