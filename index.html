@@ -83,13 +83,14 @@
     // ⚠️ ЗАМЕНЕТЕ ГО ОВОЈ URL СО ВАШИОТ ОД APPS SCRIPT!
     const API_URL = "https://script.google.com/macros/s/AKfycbx5Q8xJHO3qbT5Ebc47iX2sN3K0oUzIeY2MemUO62hF0X9DbeUqUIQw3t9K438yeQrZ/exec";
     
-    // ЛОКАЛНИ КОРИСНИЦИ САМО ЗА НАЈАВА (НЕМА API)
+    // ЛОКАЛНИ КОРИСНИЦИ САМО ЗА НАЈАВА
     const LOCAL_USERS = [
         { id: 1, name: "Дарко Димитров", position: "Раководител на сектор", email: "darko.dimitrov@na.org.mk", password: "12345", isAdmin: true },
         { id: 2, name: "Ана Митровска", position: "Директор", email: "ana.mihajlov@na.org.mk", password: "abcd", isAdmin: false }
     ];
     
     let meetings = [];
+    let users = []; // за приказ во табот "Вработени"
     let currentUser = null;
     let currentTab = "meetings";
     let lang = "mk";
@@ -98,12 +99,9 @@
     let calendarMonth = new Date().getMonth();
     let unreadNotifications = false;
     
-    // Обид за враќање на корисникот од сесија (освежување)
     const savedUser = sessionStorage.getItem('na_nau_currentUser');
     if (savedUser) {
-        try {
-            currentUser = JSON.parse(savedUser);
-        } catch(e) {}
+        try { currentUser = JSON.parse(savedUser); } catch(e) {}
     }
     
     function checkUnreadNotifications() {
@@ -143,7 +141,7 @@
             agenda: "Дневен ред", minutes: "Записник", decisions: "Заклучоци", save: "Зачувај", cancel: "Откажи",
             edit: "Уреди", delete: "Избриши", archiveBtn: "Архивирај", export: "Извештај", print: "Печати",
             noActive: "Нема активни состаноци.", noArchive: "Нема архивирани состаноци.", noNotifications: "Нема нотификации.",
-            archivedBy: "Архивиран од", archived: "Архивиран"
+            archivedBy: "Архивиран од", archived: "Архивиран", addUser: "Додади вработен", name: "Име", position: "Функција", isAdmin: "Администратор", password: "Лозинка"
         },
         en: { 
             meetings: "Meetings", newMeeting: "New Meeting", archive: "Archive", notifications: "Notifications", employees: "Employees", calendar: "Calendar",
@@ -152,7 +150,7 @@
             agenda: "Agenda", minutes: "Minutes", decisions: "Decisions", save: "Save", cancel: "Cancel",
             edit: "Edit", delete: "Delete", archiveBtn: "Archive", export: "Report", print: "Print",
             noActive: "No active meetings.", noArchive: "No archived meetings.", noNotifications: "No notifications.",
-            archivedBy: "Archived by", archived: "Archived"
+            archivedBy: "Archived by", archived: "Archived", addUser: "Add employee", name: "Name", position: "Position", isAdmin: "Administrator", password: "Password"
         }
     };
     
@@ -218,6 +216,76 @@
     async function deleteMeetingFromCloud(id) {
         await apiPost('deleteMeeting', { id: id });
         await loadMeetingsFromCloud();
+    }
+    
+    // ==================== КОРИСНИЦИ (локално за приказ и додавање) ====================
+    async function loadUsersFromCloud() {
+        const data = await apiGet('getUsers');
+        if (data.success && data.users && data.users.length > 0) {
+            users = data.users;
+        } else {
+            users = [
+                { id: 1, name: "Дарко Димитров", position: "Раководител на сектор", email: "darko.dimitrov@na.org.mk", password: "12345", isAdmin: true },
+                { id: 2, name: "Ана Митровска", position: "Директор", email: "ana.mihajlov@na.org.mk", password: "abcd", isAdmin: false }
+            ];
+        }
+    }
+    
+    async function saveUserToCloud(user) {
+        await apiPost('saveUser', user);
+        await loadUsersFromCloud();
+    }
+    
+    async function deleteUserFromCloud(id) {
+        await apiPost('deleteUser', { id: id });
+        await loadUsersFromCloud();
+    }
+    
+    async function addUser() {
+        if (!currentUser.isAdmin) return;
+        var name = document.getElementById("newName")?.value.trim();
+        var email = document.getElementById("newEmail")?.value.trim();
+        var position = document.getElementById("newPos")?.value.trim();
+        var password = document.getElementById("newPassword")?.value;
+        var isAdmin = document.getElementById("newIsAdmin")?.checked;
+        
+        if (!name || !email) { alert("Внесете име и е-пошта!"); return; }
+        for (var i = 0; i < users.length; i++) {
+            if (users[i].email === email) { alert("Веќе постои корисник!"); return; }
+        }
+        await saveUserToCloud({ id: -1, name: name, email: email, position: position || "Службеник", password: password || "12345", isAdmin: isAdmin || false });
+        document.getElementById("newName").value = '';
+        document.getElementById("newEmail").value = '';
+        document.getElementById("newPos").value = '';
+        document.getElementById("newPassword").value = '12345';
+        document.getElementById("newIsAdmin").checked = false;
+        renderApp();
+        alert("✅ Додаден!");
+    }
+    
+    async function deleteUser(userId) {
+        if (!currentUser.isAdmin) return;
+        if (userId === currentUser.id) { alert("Не можете да се избришете себеси!"); return; }
+        if (confirm("Избриши?")) {
+            await deleteUserFromCloud(userId);
+            renderApp();
+            alert("✅ Избришан!");
+        }
+    }
+    
+    async function resetUserPassword(userId) {
+        if (!currentUser.isAdmin) return;
+        var newPassword = prompt("Внесете нова лозинка:");
+        if (!newPassword || newPassword.length < 3) { alert("Лозинката мора да има барем 3 карактери!"); return; }
+        for (var i = 0; i < users.length; i++) {
+            if (users[i].id === userId) {
+                users[i].password = newPassword;
+                await saveUserToCloud(users[i]);
+                break;
+            }
+        }
+        renderApp();
+        alert("✅ Лозинката е променета!");
     }
     
     // ==================== ФУНКЦИИ ЗА СОСТАНОЦИ ====================
@@ -312,9 +380,9 @@
             var email = attendees[i];
             var name = email;
             var position = (lang === 'mk' ? 'Присутен' : 'Attendee');
-            signaturesHtml += `<tr><td>${escapeHtml(name)}</td><td>${escapeHtml(position)}</td><td style="text-align:center">_______________</td><td style="text-align:center">${formattedDate}</td></tr>`;
+            signaturesHtml += `<tr><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(name)}</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(position)}</td><td style="padding:8px;text-align:center;">_______________</td><td style="padding:8px;text-align:center;">${formattedDate}</td></tr>`;
         }
-        signaturesHtml += '</tbody>赶</div>';
+        signaturesHtml += '</tbody></table></div>';
         
         const html = `<!DOCTYPE html>
         <html><head><meta charset="UTF-8"><title>${escapeHtml(meeting.title_mk)} - Report</title>
@@ -391,13 +459,14 @@
         return html;
     }
     
-    // ==================== АВТЕНТИКАЦИЈА (локална, без API) ====================
+    // ==================== АВТЕНТИКАЦИЈА ====================
     function login(email, password) {
         for (var i = 0; i < LOCAL_USERS.length; i++) {
             if (LOCAL_USERS[i].email === email && LOCAL_USERS[i].password === password) {
                 currentUser = LOCAL_USERS[i];
                 sessionStorage.setItem('na_nau_currentUser', JSON.stringify(currentUser));
                 loadMeetingsFromCloud();
+                loadUsersFromCloud();
                 renderApp();
                 return { success: true };
             }
@@ -499,20 +568,42 @@
         </div>`;
     }
     
+    function renderEmployees() {
+        if (!currentUser.isAdmin) return `<div class="card"><div class="empty">⛔ ${lang === 'mk' ? 'Само администратор.' : 'Admin only.'}</div></div>`;
+        var html = `<div class="card"><div class="card-header"><span class="card-title">👥 ${t('employees')}</span></div>`;
+        for (var i = 0; i < users.length; i++) {
+            var u = users[i];
+            html += `<div class="employee-card">
+                <div><strong>${escapeHtml(u.name)}</strong><br><small>${escapeHtml(u.position)}</small><br><small>📧 ${escapeHtml(u.email)}</small><br>${u.isAdmin ? '👑 ' + t('isAdmin') : ''}</div>
+                <div>${u.id !== currentUser.id ? `<button class="btn btn-warning btn-sm" onclick="resetUserPassword(${u.id})" style="margin-right:5px;">🔑 Лозинка</button><button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">🗑️</button>` : ''}</div>
+            </div>`;
+        }
+        html += `</div>
+        <div class="add-user-section"><div class="card-title" style="margin-bottom:15px;">➕ ${t('addUser')}</div>
+            <div class="grid-2"><div><label>${t('name')}</label><input id="newName" placeholder="Име"></div><div><label>Email</label><input id="newEmail" placeholder="email@na.org.mk"></div>
+            <div><label>${t('position')}</label><input id="newPos" placeholder="Функција"></div><div><label>${t('password')}</label><input id="newPassword" placeholder="Лозинка" value="12345"></div></div>
+            <div style="margin:10px 0;"><label><input type="checkbox" id="newIsAdmin"> 👑 ${t('isAdmin')}</label></div>
+            <button class="btn btn-primary" onclick="addUser()">➕ ${t('addUser')}</button>
+        </div>`;
+        return html;
+    }
+    
     function renderMain() {
         var tabsList = [
             { id: "meetings", label: t('meetings') },
             { id: "new", label: t('newMeeting') },
             { id: "calendar", label: t('calendar') },
             { id: "archive", label: t('archive') },
-            { id: "notifications", label: t('notifications') }
+            { id: "notifications", label: t('notifications') },
+            { id: "employees", label: t('employees') }
         ];
         
         var tabsHtml = `<div class="tabs">`;
         for (var i = 0; i < tabsList.length; i++) {
             var tab = tabsList[i];
             var hasDot = (tab.id === "notifications" && unreadNotifications);
-            tabsHtml += `<button class="tab ${currentTab === tab.id ? 'active' : ''}" data-tab="${tab.id}" onclick="if('${tab.id}' === 'notifications') markNotificationsAsRead();">
+            var isActive = (currentTab === tab.id);
+            tabsHtml += `<button class="tab ${isActive ? 'active' : ''}" data-tab="${tab.id}" onclick="if('${tab.id}' === 'notifications') markNotificationsAsRead();">
                 ${tab.label} ${hasDot ? '<span class="notification-dot"></span>' : ''}
             </button>`;
         }
@@ -524,6 +615,7 @@
         else if (currentTab === "calendar") content = renderCalendar();
         else if (currentTab === "archive") content = renderArchive();
         else if (currentTab === "notifications") content = renderNotifications();
+        else if (currentTab === "employees") content = renderEmployees();
         
         return tabsHtml + content;
     }
@@ -597,8 +689,12 @@
     window.exportWord = exportWord;
     window.printMeeting = printMeeting;
     window.cancelForm = cancelForm;
+    window.addUser = addUser;
+    window.deleteUser = deleteUser;
+    window.resetUserPassword = resetUserPassword;
     window.setLanguage = setLanguage;
     
+    loadUsersFromCloud();
     loadMeetingsFromCloud();
     renderApp();
 </script>
