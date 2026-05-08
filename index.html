@@ -1,220 +1,745 @@
 <!DOCTYPE html>
-<html>
+<html lang="mk">
 <head>
 <meta charset="UTF-8">
-<title>Meeting System</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Систем за состаноци</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
+  :root {
+    --font-sans: 'Segoe UI', system-ui, sans-serif;
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f4f6fb;
+    --color-background-tertiary: #eef0f5;
+    --color-background-info: #e6f1fb;
+    --color-background-danger: #fcebeb;
+    --color-background-success: #eaf3de;
+    --color-background-warning: #faeeda;
+    --color-text-primary: #1a1a1a;
+    --color-text-secondary: #5f5e5a;
+    --color-text-tertiary: #888780;
+    --color-text-info: #0c447c;
+    --color-text-danger: #791f1f;
+    --color-text-success: #27500a;
+    --color-text-warning: #633806;
+    --color-border-tertiary: rgba(0,0,0,0.10);
+    --color-border-secondary: rgba(0,0,0,0.20);
+    --color-border-primary: rgba(0,0,0,0.35);
+    --color-border-info: #85b7eb;
+    --color-border-danger: #f09595;
+    --color-border-success: #97c459;
+    --color-border-warning: #ef9f27;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+    --border-radius-xl: 16px;
+  }
 
-body{
-font-family:Segoe UI;
-background:#f4f6fb;
-margin:0;
-padding:20px;
-}
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-background-primary: #1e1e1e;
+      --color-background-secondary: #2a2a2a;
+      --color-background-tertiary: #242424;
+      --color-background-info: #0c2a40;
+      --color-background-danger: #2e1010;
+      --color-background-success: #132208;
+      --color-background-warning: #2e1c06;
+      --color-text-primary: #e8e6df;
+      --color-text-secondary: #a0a09a;
+      --color-text-tertiary: #666660;
+      --color-text-info: #85b7eb;
+      --color-text-danger: #f09595;
+      --color-text-success: #97c459;
+      --color-text-warning: #ef9f27;
+      --color-border-tertiary: rgba(255,255,255,0.10);
+      --color-border-secondary: rgba(255,255,255,0.18);
+      --color-border-primary: rgba(255,255,255,0.30);
+      --color-border-info: #185fa5;
+      --color-border-danger: #a32d2d;
+      --color-border-success: #3b6d11;
+      --color-border-warning: #854f0b;
+    }
+  }
 
-.card{
-background:white;
-padding:20px;
-border-radius:12px;
-margin-bottom:15px;
-box-shadow:0 2px 10px rgba(0,0,0,0.08);
-}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-.btn{
-padding:8px 12px;
-border:none;
-border-radius:8px;
-cursor:pointer;
-margin-right:5px;
-}
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-background-tertiary);
+    color: var(--color-text-primary);
+    min-height: 100vh;
+  }
 
-.primary{background:#003399;color:white;}
-.danger{background:#d11a2a;color:white;}
-.warning{background:#f59e0b;color:white;}
+  .app {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 1.25rem 1rem;
+  }
 
-input,textarea{
-width:100%;
-padding:10px;
-margin:5px 0;
-border:1px solid #ccc;
-border-radius:8px;
-}
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 
-.header{
-display:flex;
-justify-content:space-between;
-align-items:center;
-margin-bottom:15px;
-}
+  .topbar-left { display: flex; align-items: center; gap: 10px; }
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+  .app-title { font-size: 17px; font-weight: 500; color: var(--color-text-primary); }
 
-.meeting{
-border-left:4px solid #003399;
-padding:10px;
-margin-bottom:10px;
-background:#fff;
-}
+  .lang-btn {
+    font-size: 12px; padding: 3px 10px;
+    border: 0.5px solid var(--color-border-secondary);
+    border-radius: var(--border-radius-md);
+    background: transparent; color: var(--color-text-secondary); cursor: pointer;
+  }
+  .lang-btn.active {
+    background: var(--color-background-info);
+    color: var(--color-text-info);
+    border-color: var(--color-border-info);
+  }
 
-.lang button{
-margin-left:5px;
-}
+  .card {
+    background: var(--color-background-primary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-lg);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
 
+  input, textarea, select {
+    width: 100%; padding: 8px 10px;
+    border: 0.5px solid var(--color-border-secondary);
+    border-radius: var(--border-radius-md);
+    font-size: 13px;
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    resize: vertical;
+  }
+  input:focus, textarea:focus, select:focus {
+    outline: none; border-color: #185fa5;
+    box-shadow: 0 0 0 3px rgba(24,95,165,0.12);
+  }
+  textarea { min-height: 64px; }
+
+  label {
+    font-size: 12px; color: var(--color-text-secondary);
+    display: block; margin-bottom: 3px; margin-top: 10px;
+  }
+  label:first-child { margin-top: 0; }
+
+  .btn {
+    padding: 7px 14px;
+    border: 0.5px solid var(--color-border-secondary);
+    border-radius: var(--border-radius-md);
+    cursor: pointer; font-size: 13px; font-weight: 500;
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    transition: background 0.15s;
+  }
+  .btn:hover { background: var(--color-background-secondary); }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: #003399; color: white; border-color: #003399; }
+  .btn-primary:hover { background: #002277; }
+  .btn-danger {
+    background: var(--color-background-danger);
+    color: var(--color-text-danger);
+    border-color: var(--color-border-danger);
+  }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-xs { padding: 3px 8px; font-size: 11px; }
+
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+  @media (max-width: 520px) {
+    .row2, .row3 { grid-template-columns: 1fr; }
+  }
+
+  .meeting-card {
+    border-left: 3px solid #003399;
+    border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;
+    padding: 12px 14px; margin-bottom: 8px;
+    background: var(--color-background-secondary);
+  }
+  .meeting-card.archived { border-left-color: var(--color-border-secondary); opacity: .7; }
+
+  .mtitle { font-size: 14px; font-weight: 500; color: var(--color-text-primary); }
+  .mmeta {
+    font-size: 12px; color: var(--color-text-secondary);
+    display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 6px;
+  }
+  .magenda {
+    font-size: 12px; color: var(--color-text-secondary);
+    line-height: 1.5; margin-bottom: 8px; white-space: pre-wrap;
+  }
+  .mactions { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 8px; }
+
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: var(--border-radius-md); }
+  .badge-info { background: var(--color-background-info); color: var(--color-text-info); }
+  .badge-gray {
+    background: var(--color-background-secondary);
+    color: var(--color-text-secondary);
+    border: 0.5px solid var(--color-border-tertiary);
+  }
+
+  .avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--color-background-info); color: var(--color-text-info);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 500; flex-shrink: 0;
+  }
+
+  .spinner {
+    display: inline-block; width: 13px; height: 13px;
+    border: 2px solid var(--color-border-secondary);
+    border-top-color: #003399; border-radius: 50%;
+    animation: spin .6s linear infinite;
+    vertical-align: -2px; margin-right: 5px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .err { font-size: 12px; color: var(--color-text-danger); margin-top: 6px; }
+
+  .tabs {
+    display: flex; gap: 2px;
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+    margin-bottom: 1rem;
+  }
+  .tab {
+    font-size: 13px; padding: 6px 14px; border: none; background: none;
+    cursor: pointer; color: var(--color-text-secondary);
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    font-family: var(--font-sans);
+  }
+  .tab.active { color: var(--color-text-primary); border-bottom-color: #003399; font-weight: 500; }
+
+  .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .filter-row input { width: auto; flex: 1; min-width: 140px; padding: 6px 10px; }
+
+  .expand-btn {
+    font-size: 12px; color: var(--color-text-secondary);
+    background: none; border: none; cursor: pointer; padding: 0;
+    font-family: var(--font-sans);
+  }
+
+  .detail-block { margin-top: 8px; padding-top: 8px; border-top: 0.5px solid var(--color-border-tertiary); }
+  .detail-label { font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 2px; }
+  .detail-text { font-size: 12px; color: var(--color-text-primary); white-space: pre-wrap; line-height: 1.5; }
+
+  .empty { text-align: center; padding: 2rem 1rem; color: var(--color-text-secondary); font-size: 13px; }
+  .sr-only { position: absolute; left: -9999px; }
 </style>
-
 </head>
-
 <body>
+<div class="app">
+  <h1 class="sr-only">Систем за состаноци / Meeting System</h1>
 
-<div class="header">
-<h2>Meeting System</h2>
+  <div class="topbar">
+    <div class="topbar-left">
+      <i class="ti ti-calendar-event" style="font-size:20px;color:#003399;" aria-hidden="true"></i>
+      <span class="app-title" id="sys-title">Систем за состаноци</span>
+    </div>
+    <div class="topbar-right">
+      <button class="lang-btn active" onclick="setLang('mk')" id="btn-mk">MK</button>
+      <button class="lang-btn" onclick="setLang('en')" id="btn-en">EN</button>
+      <div id="ubar"></div>
+    </div>
+  </div>
 
-<div class="lang">
-<button onclick="lang='mk';render()">MK</button>
-<button onclick="lang='en';render()">EN</button>
+  <div id="content"></div>
 </div>
-
-</div>
-
-<div id="app"></div>
 
 <script>
+// ============================================================
+// CONFIG — замени го со твојот Apps Script Deployment URL
+// ============================================================
+const API = "https://script.google.com/macros/s/AKfycbz7jaVYll42a2bv7H4tn02PDYPvPf4SARU1KFLYK1BTGGpF5ZXqKRZBVMJuTJoIh25U/exec";
 
-const API = "https://script.google.com/macros/s/AKfycbykp4Wp9dt1ChN6qFcgPyuOJv0d6uG4bLFyfcKvPaQ39CS_Vg_Sa-YPBbWywQlq-1dU/exec";
+// ============================================================
+// STATE
+// ============================================================
+let meetings = [], users = [], currentUser = null, lang = "mk";
+let loading = false, view = "meetings", loginErr = "";
+let filter = "", showArchived = false, expandedId = null;
+let editingId = null, showAddForm = false, showAddUser = false;
 
-let meetings = [];
-let users = [];
-let currentUser = null;
-let lang = "mk";
+// ============================================================
+// TRANSLATIONS
+// ============================================================
+const T = {
+  sysTitle:     { mk: "Систем за состаноци",   en: "Meeting System" },
+  login:        { mk: "Најава",                en: "Login" },
+  email:        { mk: "Е-пошта",              en: "Email" },
+  pass:         { mk: "Лозинка",              en: "Password" },
+  signIn:       { mk: "Влези",               en: "Sign in" },
+  logout:       { mk: "Одјави се",            en: "Sign out" },
+  wrongCreds:   { mk: "Погрешни податоци",    en: "Wrong credentials" },
+  meetings:     { mk: "Состаноци",            en: "Meetings" },
+  users:        { mk: "Корисници",            en: "Users" },
+  addMeeting:   { mk: "+ Нов состанок",       en: "+ New meeting" },
+  editMeeting:  { mk: "Уреди состанок",       en: "Edit meeting" },
+  addUser:      { mk: "+ Нов корисник",       en: "+ New user" },
+  delete:       { mk: "Избриши",              en: "Delete" },
+  archive:      { mk: "Архивирај",            en: "Archive" },
+  unarchive:    { mk: "Врати",               en: "Restore" },
+  exportWord:   { mk: "Word",                en: "Word" },
+  noMeetings:   { mk: "Нема состаноци",       en: "No meetings" },
+  noUsers:      { mk: "Нема корисници",       en: "No users" },
+  loading:      { mk: "Се вчитува…",          en: "Loading…" },
+  save:         { mk: "Зачувај",              en: "Save" },
+  cancel:       { mk: "Откажи",              en: "Cancel" },
+  search:       { mk: "Пребарај…",           en: "Search…" },
+  showArchived: { mk: "Прикажи архивирани",  en: "Show archived" },
+  hideArchived: { mk: "Сокриј архивирани",   en: "Hide archived" },
+  titleMk:      { mk: "Наслов (МК)",         en: "Title (МК)" },
+  titleEn:      { mk: "Наслов (EN)",         en: "Title (EN)" },
+  date:         { mk: "Датум",               en: "Date" },
+  time:         { mk: "Час",                 en: "Time" },
+  location:     { mk: "Локација",            en: "Location" },
+  attendees:    { mk: "Учесници",            en: "Attendees" },
+  agendaMk:     { mk: "Агенда (МК)",         en: "Agenda (МК)" },
+  agendaEn:     { mk: "Агенда (EN)",         en: "Agenda (EN)" },
+  minutesMk:    { mk: "Записник (МК)",       en: "Minutes (МК)" },
+  minutesEn:    { mk: "Записник (EN)",       en: "Minutes (EN)" },
+  decisionsMk:  { mk: "Одлуки (МК)",         en: "Decisions (МК)" },
+  decisionsEn:  { mk: "Одлуки (EN)",         en: "Decisions (EN)" },
+  name:         { mk: "Име",                 en: "Name" },
+  position:     { mk: "Позиција",            en: "Position" },
+  isAdmin:      { mk: "Администратор",       en: "Admin" },
+  details:      { mk: "Детали ▾",            en: "Details ▾" },
+  hideDetails:  { mk: "Скриј ▴",             en: "Hide ▴" },
+  archived:     { mk: "Архивирано",          en: "Archived" },
+  admin:        { mk: "Админ",               en: "Admin" },
+  by:           { mk: "Создаден од",         en: "Created by" },
+  confirmDel:   { mk: "Сигурно?",            en: "Are you sure?" },
+};
+function t(k) { return T[k]?.[lang] || k; }
 
-// =========================
-async function get(a){
-  const r = await fetch(API+"?action="+a);
-  return await r.json();
+// ============================================================
+// API HELPERS
+// ============================================================
+async function apiGet(action) {
+  const r = await fetch(API + "?action=" + action);
+  return r.json();
 }
-
-async function post(d){
-  await fetch(API,{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify(d)
+async function apiPost(data) {
+  return fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
   });
 }
 
-// ========================= LOGIN
-async function login(){
-
-users = (await get("getUsers")).users || [];
-
-const email = prompt("email");
-const pass = prompt("password");
-
-currentUser = users.find(u =>
-  (u.email||"").toLowerCase()===email.toLowerCase()
-  && u.password===pass
-);
-
-if(!currentUser){
-  alert("Wrong credentials");
-  return;
+// ============================================================
+// UTILS
+// ============================================================
+function ini(n) {
+  return (n || "?").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+}
+function isAdmin() {
+  return String(currentUser?.isadmin || currentUser?.isAdmin) === "true";
+}
+function setLang(l) {
+  lang = l;
+  document.getElementById("btn-mk").classList.toggle("active", l === "mk");
+  document.getElementById("btn-en").classList.toggle("active", l === "en");
+  render();
 }
 
-load();
-
+// ============================================================
+// AUTH
+// ============================================================
+async function doLogin() {
+  loginErr = ""; render();
+  const em = document.getElementById("ie")?.value?.trim();
+  const pw = document.getElementById("ip")?.value;
+  if (!em || !pw) { loginErr = t("wrongCreds"); render(); return; }
+  loading = true; render();
+  try {
+    const res = await apiGet("getUsers");
+    users = res.users || [];
+    currentUser = users.find(u =>
+      (u.email || "").toLowerCase() === em.toLowerCase() && u.password === pw
+    );
+    if (!currentUser) { loginErr = t("wrongCreds"); loading = false; render(); return; }
+    await loadMeetings();
+  } catch {
+    loginErr = t("wrongCreds"); loading = false; render();
+  }
 }
 
-// ========================= LOAD
-async function load(){
+// ============================================================
+// DATA LOADERS
+// ============================================================
+async function loadMeetings() {
+  loading = true; render();
+  try { const r = await apiGet("getMeetings"); meetings = r.meetings || []; }
+  catch { meetings = []; }
+  loading = false; showAddForm = false; editingId = null; render();
+}
 
-meetings = (await get("getMeetings")).meetings || [];
+async function loadUsers() {
+  loading = true; render();
+  try { const r = await apiGet("getUsers"); users = r.users || []; }
+  catch { users = []; }
+  loading = false; showAddUser = false; render();
+}
 
+// ============================================================
+// MEETING ACTIONS
+// ============================================================
+async function doDeleteMeeting(id) {
+  if (!confirm(t("confirmDel"))) return;
+  loading = true; render();
+  try { await apiPost({ action: "deleteMeeting", id }); } catch {}
+  await loadMeetings();
+}
+
+async function doArchive(id, val) {
+  loading = true; render();
+  const m = meetings.find(x => String(x.id) === String(id));
+  if (!m) { loading = false; render(); return; }
+  try {
+    await apiPost({ action: "deleteMeeting", id });
+    await apiPost({ action: "saveMeeting", ...m, archived: val });
+  } catch {}
+  await loadMeetings();
+}
+
+async function doSaveMeeting() {
+  const g = id => document.getElementById(id)?.value || "";
+  const data = {
+    action:       "saveMeeting",
+    id:           g("f-id") || Date.now(),
+    title_mk:     g("f-tmk"),
+    title_en:     g("f-ten"),
+    date:         g("f-date"),
+    time:         g("f-time"),
+    location:     g("f-loc"),
+    attendees:    g("f-att"),
+    agenda_mk:    g("f-amk"),
+    agenda_en:    g("f-aen"),
+    minutes_mk:   g("f-mmk"),
+    minutes_en:   g("f-men"),
+    decisions_mk: g("f-dmk"),
+    decisions_en: g("f-den"),
+    createdBy:    currentUser.name || currentUser.email,
+    archived:     false
+  };
+  loading = true; render();
+  if (editingId) {
+    try { await apiPost({ action: "deleteMeeting", id: editingId }); } catch {}
+  }
+  try { await apiPost(data); } catch {}
+  editingId = null;
+  await loadMeetings();
+}
+
+// ============================================================
+// USER ACTIONS
+// ============================================================
+async function doSaveUser() {
+  const g = id => document.getElementById(id)?.value || "";
+  const data = {
+    action:   "saveUser",
+    id:       Date.now(),
+    name:     g("fu-name"),
+    position: g("fu-pos"),
+    email:    g("fu-email"),
+    password: g("fu-pass"),
+    isAdmin:  document.getElementById("fu-admin")?.checked || false
+  };
+  loading = true; render();
+  try { await apiPost(data); } catch {}
+  await loadUsers();
+}
+
+// ============================================================
+// EXPORT WORD
+// ============================================================
+function doExportWord(id) {
+  const m = meetings.find(x => String(x.id) === String(id));
+  if (!m) return;
+  const html = `<html><body style="font-family:Calibri,sans-serif;max-width:700px;margin:auto;padding:30px">
+<h1 style="color:#003399">${m.title_mk || ""}</h1>
+<h2 style="color:#555">${m.title_en || ""}</h2>
+<table style="border-collapse:collapse;width:100%;margin:16px 0;font-size:13px">
+  <tr><td style="padding:5px 8px;color:#666;width:140px">Датум / Date</td><td style="padding:5px 8px">${m.date || ""} ${m.time || ""}</td></tr>
+  <tr><td style="padding:5px 8px;color:#666">Локација / Location</td><td style="padding:5px 8px">${m.location || "-"}</td></tr>
+  <tr><td style="padding:5px 8px;color:#666">Учесници / Attendees</td><td style="padding:5px 8px">${m.attendees || "-"}</td></tr>
+  <tr><td style="padding:5px 8px;color:#666">${t("by")}</td><td style="padding:5px 8px">${m.createdby || m.createdBy || "-"}</td></tr>
+</table>
+${m.agenda_mk   ? `<h3 style="color:#003399;margin-top:20px">Агенда</h3><p style="white-space:pre-wrap;font-size:13px">${m.agenda_mk}</p>` : ""}
+${m.agenda_en   ? `<h3 style="color:#003399">Agenda</h3><p style="white-space:pre-wrap;font-size:13px">${m.agenda_en}</p>` : ""}
+${m.minutes_mk  ? `<h3 style="color:#003399;margin-top:20px">Записник</h3><p style="white-space:pre-wrap;font-size:13px">${m.minutes_mk}</p>` : ""}
+${m.minutes_en  ? `<h3 style="color:#003399">Minutes</h3><p style="white-space:pre-wrap;font-size:13px">${m.minutes_en}</p>` : ""}
+${m.decisions_mk? `<h3 style="color:#003399;margin-top:20px">Одлуки</h3><p style="white-space:pre-wrap;font-size:13px">${m.decisions_mk}</p>` : ""}
+${m.decisions_en? `<h3 style="color:#003399">Decisions</h3><p style="white-space:pre-wrap;font-size:13px">${m.decisions_en}</p>` : ""}
+</body></html>`;
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob([html], { type: "application/msword" })),
+    download: `meeting-${m.id}.doc`
+  });
+  a.click();
+}
+
+// ============================================================
+// RENDER — LOGIN
+// ============================================================
+function renderLogin() {
+  return `
+  <div style="display:flex;justify-content:center;padding:2rem 0">
+  <div class="card" style="max-width:340px;width:100%">
+    <div style="text-align:center;margin-bottom:1rem">
+      <div style="width:44px;height:44px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;margin:0 auto 8px">
+        <i class="ti ti-lock" style="font-size:20px;color:var(--color-text-info)" aria-hidden="true"></i>
+      </div>
+      <p style="font-size:15px;font-weight:500">${t("login")}</p>
+    </div>
+    <label>${t("email")}</label>
+    <input id="ie" type="email" placeholder="user@example.com"
+      onkeydown="if(event.key==='Enter')document.getElementById('ip').focus()">
+    <label>${t("pass")}</label>
+    <input id="ip" type="password" placeholder="••••••"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    ${loginErr ? `<div class="err"><i class="ti ti-alert-circle" aria-hidden="true"></i> ${loginErr}</div>` : ""}
+    <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="doLogin()">
+      ${loading ? `<span class="spinner"></span>` : ""} ${t("signIn")}
+    </button>
+  </div></div>`;
+}
+
+// ============================================================
+// RENDER — MEETING FORM
+// ============================================================
+function renderMeetingForm(m) {
+  const isEdit = !!m;
+  const v = (field, fallback = "") => isEdit ? (m[field] || fallback) : fallback;
+  return `
+  <div class="card" style="border-color:#185fa5">
+    <p style="font-size:14px;font-weight:500;margin-bottom:10px">${isEdit ? t("editMeeting") : t("addMeeting")}</p>
+    <input type="hidden" id="f-id" value="${v("id")}">
+    <div class="row2">
+      <div><label>${t("titleMk")}</label><input id="f-tmk" value="${v("title_mk")}"></div>
+      <div><label>${t("titleEn")}</label><input id="f-ten" value="${v("title_en")}"></div>
+    </div>
+    <div class="row3">
+      <div><label>${t("date")}</label><input id="f-date" type="date" value="${v("date")}"></div>
+      <div><label>${t("time")}</label><input id="f-time" type="time" value="${v("time")}"></div>
+      <div><label>${t("location")}</label><input id="f-loc" value="${v("location")}"></div>
+    </div>
+    <label>${t("attendees")}</label>
+    <input id="f-att" placeholder="А. Петров, Б. Ристова…" value="${v("attendees")}">
+    <div class="row2">
+      <div><label>${t("agendaMk")}</label><textarea id="f-amk">${v("agenda_mk")}</textarea></div>
+      <div><label>${t("agendaEn")}</label><textarea id="f-aen">${v("agenda_en")}</textarea></div>
+    </div>
+    <div class="row2">
+      <div><label>${t("minutesMk")}</label><textarea id="f-mmk">${v("minutes_mk")}</textarea></div>
+      <div><label>${t("minutesEn")}</label><textarea id="f-men">${v("minutes_en")}</textarea></div>
+    </div>
+    <div class="row2">
+      <div><label>${t("decisionsMk")}</label><textarea id="f-dmk">${v("decisions_mk")}</textarea></div>
+      <div><label>${t("decisionsEn")}</label><textarea id="f-den">${v("decisions_en")}</textarea></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary" onclick="doSaveMeeting()">${t("save")}</button>
+      <button class="btn" onclick="showAddForm=false;editingId=null;render()">${t("cancel")}</button>
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// RENDER — MEETINGS LIST
+// ============================================================
+function renderMeetings() {
+  const fl = filter.toLowerCase();
+  const list = meetings.filter(m => {
+    if (String(m.archived) === "true" && !showArchived) return false;
+    if (!fl) return true;
+    return (m.title_mk + m.title_en + m.location + m.attendees + m.agenda_mk + m.agenda_en)
+      .toLowerCase().includes(fl);
+  });
+
+  let html = `
+  <div class="section-head">
+    <span style="font-size:13px;color:var(--color-text-secondary)">${list.length} ${t("meetings")}</span>
+    <button class="btn btn-primary btn-sm" onclick="showAddForm=!showAddForm;editingId=null;render()">
+      ${t("addMeeting")}
+    </button>
+  </div>
+  <div class="filter-row">
+    <input placeholder="${t("search")}" value="${filter}" oninput="filter=this.value;render()">
+    <button class="btn btn-sm" onclick="showArchived=!showArchived;render()">
+      ${showArchived ? t("hideArchived") : t("showArchived")}
+    </button>
+  </div>`;
+
+  if (showAddForm && !editingId) html += renderMeetingForm(null);
+
+  if (list.length === 0) {
+    html += `<div class="empty">
+      <i class="ti ti-calendar-off" style="font-size:28px;display:block;margin-bottom:6px" aria-hidden="true"></i>
+      ${t("noMeetings")}
+    </div>`;
+  } else {
+    html += list.map(m => {
+      const isArch = String(m.archived) === "true";
+      const exp    = String(expandedId) === String(m.id);
+      const isEdit = String(editingId)  === String(m.id);
+
+      if (isEdit) return renderMeetingForm(m);
+
+      const title    = lang === "mk" ? m.title_mk || m.title_en : m.title_en || m.title_mk;
+      const agenda   = lang === "mk" ? m.agenda_mk   : m.agenda_en;
+      const minutes  = lang === "mk" ? m.minutes_mk  : m.minutes_en;
+      const decisions= lang === "mk" ? m.decisions_mk: m.decisions_en;
+
+      return `
+      <div class="meeting-card${isArch ? " archived" : ""}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="flex:1;min-width:0">
+            <div class="mtitle">${title || "—"}</div>
+            <div class="mmeta">
+              ${m.date    ? `<span><i class="ti ti-calendar" style="font-size:12px" aria-hidden="true"></i> ${m.date}${m.time ? " " + m.time : ""}</span>` : ""}
+              ${m.location? `<span><i class="ti ti-map-pin" style="font-size:12px" aria-hidden="true"></i> ${m.location}</span>` : ""}
+              ${m.attendees?`<span><i class="ti ti-users" style="font-size:12px" aria-hidden="true"></i> ${m.attendees}</span>` : ""}
+            </div>
+            ${agenda ? `<div class="magenda">${agenda.length > 140 ? agenda.slice(0, 140) + "…" : agenda}</div>` : ""}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+            ${isArch ? `<span class="badge badge-gray">${t("archived")}</span>` : ""}
+            ${(m.createdby || m.createdBy) ? `<span class="badge badge-info">${m.createdby || m.createdBy}</span>` : ""}
+          </div>
+        </div>
+
+        ${exp ? `<div class="detail-block">
+          ${minutes   ? `<div class="detail-label">${lang==="mk"?t("minutesMk"):t("minutesEn")}</div><div class="detail-text">${minutes}</div>` : ""}
+          ${decisions ? `<div class="detail-label" style="margin-top:8px">${lang==="mk"?t("decisionsMk"):t("decisionsEn")}</div><div class="detail-text">${decisions}</div>` : ""}
+        </div>` : ""}
+
+        <div class="mactions">
+          ${(minutes || decisions) ? `<button class="expand-btn" onclick="expandedId=expandedId===String(${m.id})?null:'${m.id}';render()">${exp ? t("hideDetails") : t("details")}</button>` : ""}
+          <button class="btn btn-xs" onclick="doExportWord('${m.id}')">
+            <i class="ti ti-file-text" aria-hidden="true"></i> ${t("exportWord")}
+          </button>
+          ${isAdmin() ? `<button class="btn btn-xs" onclick="editingId='${m.id}';showAddForm=false;render()" aria-label="Edit">
+            <i class="ti ti-edit" aria-hidden="true"></i>
+          </button>` : ""}
+          ${isAdmin() ? `<button class="btn btn-xs" onclick="doArchive('${m.id}',${!isArch})" aria-label="${isArch ? t('unarchive') : t('archive')}">
+            <i class="ti ti-archive" aria-hidden="true"></i>
+          </button>` : ""}
+          ${isAdmin() ? `<button class="btn btn-xs btn-danger" onclick="doDeleteMeeting('${m.id}')" aria-label="${t('delete')}">
+            <i class="ti ti-trash" aria-hidden="true"></i>
+          </button>` : ""}
+        </div>
+      </div>`;
+    }).join("");
+  }
+  return html;
+}
+
+// ============================================================
+// RENDER — USERS LIST
+// ============================================================
+function renderUsers() {
+  let html = `
+  <div class="section-head">
+    <span style="font-size:13px;color:var(--color-text-secondary)">${users.length} ${t("users")}</span>
+    ${isAdmin() ? `<button class="btn btn-primary btn-sm" onclick="showAddUser=!showAddUser;render()">${t("addUser")}</button>` : ""}
+  </div>`;
+
+  if (showAddUser && isAdmin()) {
+    html += `
+    <div class="card" style="border-color:#185fa5">
+      <p style="font-size:14px;font-weight:500;margin-bottom:10px">${t("addUser")}</p>
+      <div class="row2">
+        <div><label>${t("name")}</label><input id="fu-name"></div>
+        <div><label>${t("position")}</label><input id="fu-pos"></div>
+      </div>
+      <div class="row2">
+        <div><label>${t("email")}</label><input id="fu-email" type="email"></div>
+        <div><label>${t("pass")}</label><input id="fu-pass" type="password"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;margin-top:10px;cursor:pointer">
+        <input id="fu-admin" type="checkbox" style="width:auto"> ${t("isAdmin")}
+      </label>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn btn-primary" onclick="doSaveUser()">${t("save")}</button>
+        <button class="btn" onclick="showAddUser=false;render()">${t("cancel")}</button>
+      </div>
+    </div>`;
+  }
+
+  if (users.length === 0) {
+    html += `<div class="empty">${t("noUsers")}</div>`;
+  } else {
+    html += users.map(u => `
+    <div class="card" style="display:flex;align-items:center;gap:12px;padding:10px 14px">
+      <div class="avatar">${ini(u.name)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:500">${u.name || ""}</div>
+        <div style="font-size:12px;color:var(--color-text-secondary)">
+          ${u.position || ""}${u.email ? " · " + u.email : ""}
+        </div>
+      </div>
+      ${String(u.isadmin || u.isAdmin) === "true"
+        ? `<span class="badge badge-info">${t("admin")}</span>`
+        : `<span class="badge badge-gray">${t("users")}</span>`}
+    </div>`).join("");
+  }
+  return html;
+}
+
+// ============================================================
+// MAIN RENDER
+// ============================================================
+function render() {
+  document.getElementById("sys-title").textContent = t("sysTitle");
+  document.title = t("sysTitle");
+
+  const ub = document.getElementById("ubar");
+  if (currentUser) {
+    ub.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="avatar">${ini(currentUser.name || currentUser.email)}</div>
+      <span style="font-size:13px;color:var(--color-text-secondary);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        ${currentUser.name || currentUser.email}
+      </span>
+      <button class="btn btn-sm" onclick="currentUser=null;meetings=[];users=[];render()">${t("logout")}</button>
+    </div>`;
+  } else {
+    ub.innerHTML = "";
+  }
+
+  const c = document.getElementById("content");
+
+  if (!currentUser) { c.innerHTML = renderLogin(); return; }
+
+  if (loading) {
+    c.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--color-text-secondary);font-size:13px">
+      <span class="spinner"></span>${t("loading")}
+    </div>`;
+    return;
+  }
+
+  c.innerHTML = `
+  <div class="tabs">
+    <button class="tab${view === "meetings" ? " active" : ""}" onclick="view='meetings';loadMeetings()">${t("meetings")}</button>
+    ${isAdmin() ? `<button class="tab${view === "users" ? " active" : ""}" onclick="view='users';loadUsers()">${t("users")}</button>` : ""}
+  </div>
+  ${view === "meetings" ? renderMeetings() : renderUsers()}`;
+}
+
+// ============================================================
+// BOOT
+// ============================================================
 render();
-
-}
-
-// ========================= RENDER
-function t(mk,en){
-  return lang==="mk"?mk:en;
-}
-
-function render(){
-
-const app = document.getElementById("app");
-
-if(!currentUser){
-app.innerHTML = `<button onclick="login()">Login</button>`;
-return;
-}
-
-app.innerHTML = `
-
-<div class="card">
-<h3>${t("Состаноци","Meetings")}</h3>
-
-${meetings.map(m=>`
-
-<div class="meeting">
-
-<h3>${lang==="mk"?m.title_mk:m.title_en}</h3>
-
-<p>${m.date} ${m.time}</p>
-<p>${m.location}</p>
-
-<p style="color:gray">
-${lang==="mk"?m.agenda_mk:m.agenda_en}
-</p>
-
-<button class="btn primary" onclick="exportWord(${m.id})">Word</button>
-<button class="btn danger" onclick="del(${m.id})">${t("Избриши","Delete")}</button>
-
-</div>
-
-`).join("")}
-
-</div>
-
-`;
-
-}
-
-// ========================= DELETE
-async function del(id){
-await post({action:"deleteMeeting",id});
-load();
-}
-
-// ========================= SAVE (demo)
-async function saveDemo(){
-await post({
-action:"saveMeeting",
-id:Date.now(),
-title_mk:"Состанок",
-title_en:"Meeting",
-date:"2026-01-01",
-time:"10:00",
-createdBy: currentUser.name
-});
-load();
-}
-
-// ========================= WORD
-function exportWord(id){
-
-const m = meetings.find(x=>String(x.id)==String(id));
-
-const html = `
-<h1>${m.title_mk} / ${m.title_en}</h1>
-<p>Created by D.Dimitrov</p>
-`;
-
-const blob = new Blob([html],{type:"application/msword"});
-const a=document.createElement("a");
-a.href=URL.createObjectURL(blob);
-a.download="report.doc";
-a.click();
-
-}
-
 </script>
-
 </body>
 </html>
