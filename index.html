@@ -387,7 +387,6 @@ function isAdmin() {
   if (!currentUser) return false;
   const adminValue = currentUser.isadmin !== undefined ? currentUser.isadmin : currentUser.isAdmin;
   const isAdminBool = adminValue === true || adminValue === "true";
-  debugLog(`isAdmin check: ${isAdminBool} (value: ${adminValue})`);
   return isAdminBool;
 }
 function setLang(l) {
@@ -444,7 +443,7 @@ async function doLogin() {
     
     if (!currentUser) { 
       debugLog("No matching user found");
-      loginErr = t("wrongCreds"); 
+      loginErr = "Погрешни податоци! Користете: admin@admin.com / admin123"; 
       loading = false; 
       render(); 
       return; 
@@ -668,10 +667,10 @@ function renderLogin() {
         🔒
       </div>
       <p style="font-size:15px;font-weight:500">${t("login")}</p>
-      <p style="font-size:11px;color:var(--color-text-tertiary);margin-top:5px">admin@example.com / admin123</p>
+      <p style="font-size:11px;color:var(--color-text-tertiary);margin-top:5px">admin@admin.com / admin123</p>
     </div>
     <label>${t("email")}</label>
-    <input id="ie" type="email" placeholder="admin@example.com" value="admin@example.com"
+    <input id="ie" type="email" placeholder="admin@admin.com" value="admin@admin.com"
       onkeydown="if(event.key==='Enter')document.getElementById('ip').focus()">
     <label>${t("pass")}</label>
     <input id="ip" type="password" placeholder="admin123" value="admin123"
