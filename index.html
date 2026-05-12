@@ -233,6 +233,21 @@
 
   .empty { text-align: center; padding: 2rem 1rem; color: var(--color-text-secondary); font-size: 13px; }
   .sr-only { position: absolute; left: -9999px; }
+  
+  .debug-console {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.8);
+    color: #0f0;
+    font-family: monospace;
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: 5px;
+    max-width: 300px;
+    z-index: 9999;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -241,7 +256,7 @@
 
   <div class="topbar">
     <div class="topbar-left">
-      <span style="color:#003399">${ICONS.calendar}</span>
+      <span style="color:#003399">📅</span>
       <span class="app-title" id="sys-title">Систем за состаноци</span>
     </div>
     <div class="topbar-right">
@@ -256,9 +271,9 @@
 
 <script>
 // ============================================================
-// CONFIG — замени го со твојот Apps Script Deployment URL
+// CONFIG — ВНЕСИ ГО ТВОЈОТ APPS SCRIPT URL
 // ============================================================
-const API = "https://script.google.com/macros/s/AKfycbzdhxj1BLo59guRK2VNcndvB1Y47f1XEcsr1Rt-BvPsTkXD-c5DD7101iEY6kTMyj9s/exec";
+const API = "https://script.google.com/macros/s/AKfycbz7jaVYll42a2bv7H4tn02PDYPvPf4SARU1KFLYK1BTGGpF5ZXqKRZBVMJuTJoIh25U/exec";
 
 // ============================================================
 // STATE
@@ -267,6 +282,26 @@ let meetings = [], users = [], currentUser = null, lang = "mk";
 let loading = false, view = "meetings", loginErr = "";
 let filter = "", showArchived = false, expandedId = null;
 let editingId = null, showAddForm = false, showAddUser = false;
+let debugMessages = [];
+
+// ============================================================
+// DEBUG HELPER
+// ============================================================
+function debugLog(msg) {
+  console.log("[DEBUG]", msg);
+  debugMessages.unshift(msg + " - " + new Date().toLocaleTimeString());
+  if (debugMessages.length > 5) debugMessages.pop();
+  
+  let debugDiv = document.getElementById("debugConsole");
+  if (!debugDiv) {
+    debugDiv = document.createElement("div");
+    debugDiv.id = "debugConsole";
+    debugDiv.className = "debug-console";
+    debugDiv.onclick = () => alert(debugMessages.join("\n"));
+    document.body.appendChild(debugDiv);
+  }
+  debugDiv.innerHTML = "🐛 " + (debugMessages[0] || "OK");
+}
 
 // ============================================================
 // TRANSLATIONS
@@ -296,17 +331,17 @@ const T = {
   search:       { mk: "Пребарај…",           en: "Search…" },
   showArchived: { mk: "Прикажи архивирани",  en: "Show archived" },
   hideArchived: { mk: "Сокриј архивирани",   en: "Hide archived" },
-  titleMk:      { mk: "Наслов (МК)",         en: "Title (МК)" },
+  titleMk:      { mk: "Наслов (МК)",         en: "Title (MK)" },
   titleEn:      { mk: "Наслов (EN)",         en: "Title (EN)" },
   date:         { mk: "Датум",               en: "Date" },
   time:         { mk: "Час",                 en: "Time" },
   location:     { mk: "Локација",            en: "Location" },
   attendees:    { mk: "Учесници",            en: "Attendees" },
-  agendaMk:     { mk: "Агенда (МК)",         en: "Agenda (МК)" },
+  agendaMk:     { mk: "Агенда (МК)",         en: "Agenda (MK)" },
   agendaEn:     { mk: "Агенда (EN)",         en: "Agenda (EN)" },
-  minutesMk:    { mk: "Записник (МК)",       en: "Minutes (МК)" },
+  minutesMk:    { mk: "Записник (МК)",       en: "Minutes (MK)" },
   minutesEn:    { mk: "Записник (EN)",       en: "Minutes (EN)" },
-  decisionsMk:  { mk: "Одлуки (МК)",         en: "Decisions (МК)" },
+  decisionsMk:  { mk: "Одлуки (МК)",         en: "Decisions (MK)" },
   decisionsEn:  { mk: "Одлуки (EN)",         en: "Decisions (EN)" },
   name:         { mk: "Име",                 en: "Name" },
   position:     { mk: "Позиција",            en: "Position" },
@@ -324,15 +359,22 @@ function t(k) { return T[k]?.[lang] || k; }
 // API HELPERS
 // ============================================================
 async function apiGet(action) {
+  debugLog(`API GET: ${action}`);
   const r = await fetch(API + "?action=" + action);
-  return r.json();
+  const data = await r.json();
+  debugLog(`Response: ${JSON.stringify(data).substring(0, 200)}`);
+  return data;
 }
 async function apiPost(data) {
-  return fetch(API, {
+  debugLog(`API POST: ${data.action}`);
+  const response = await fetch(API, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
   });
+  const result = await response.json();
+  debugLog(`POST result: ${JSON.stringify(result)}`);
+  return result;
 }
 
 // ============================================================
@@ -342,7 +384,11 @@ function ini(n) {
   return (n || "?").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 }
 function isAdmin() {
-  return String(currentUser?.isadmin || currentUser?.isAdmin) === "true";
+  if (!currentUser) return false;
+  const adminValue = currentUser.isadmin !== undefined ? currentUser.isadmin : currentUser.isAdmin;
+  const isAdminBool = adminValue === true || adminValue === "true";
+  debugLog(`isAdmin check: ${isAdminBool} (value: ${adminValue})`);
+  return isAdminBool;
 }
 function setLang(l) {
   lang = l;
@@ -355,21 +401,65 @@ function setLang(l) {
 // AUTH
 // ============================================================
 async function doLogin() {
-  loginErr = ""; render();
+  loginErr = ""; 
+  render();
+  
   const em = document.getElementById("ie")?.value?.trim();
   const pw = document.getElementById("ip")?.value;
-  if (!em || !pw) { loginErr = t("wrongCreds"); render(); return; }
-  loading = true; render();
+  
+  debugLog(`Login attempt with email: ${em}`);
+  
+  if (!em || !pw) { 
+    loginErr = t("wrongCreds"); 
+    render(); 
+    return; 
+  }
+  
+  loading = true; 
+  render();
+  
   try {
     const res = await apiGet("getUsers");
+    debugLog(`Users response success: ${res.success}`);
+    
+    if (!res.success) {
+      throw new Error(res.error || "Failed to load users");
+    }
+    
     users = res.users || [];
-    currentUser = users.find(u =>
-      (u.email || "").toLowerCase() === em.toLowerCase() && u.password === pw
-    );
-    if (!currentUser) { loginErr = t("wrongCreds"); loading = false; render(); return; }
+    debugLog(`Found ${users.length} users in system`);
+    
+    if (users.length > 0) {
+      debugLog(`First user email: ${users[0].email}`);
+    }
+    
+    currentUser = users.find(u => {
+      const emailMatch = (u.email || "").toLowerCase() === em.toLowerCase();
+      const passMatch = u.password === pw;
+      if (emailMatch) {
+        debugLog(`User found: ${u.email}, password match: ${passMatch}`);
+      }
+      return emailMatch && passMatch;
+    });
+    
+    if (!currentUser) { 
+      debugLog("No matching user found");
+      loginErr = t("wrongCreds"); 
+      loading = false; 
+      render(); 
+      return; 
+    }
+    
+    debugLog(`Login successful for: ${currentUser.email}`);
+    currentUser.isAdmin = currentUser.isadmin === true || currentUser.isadmin === "true";
+    
     await loadMeetings();
-  } catch {
-    loginErr = t("wrongCreds"); loading = false; render();
+  } catch(e) { 
+    debugLog(`Login error: ${e.message}`);
+    console.error("Login error:", e);
+    loginErr = t("wrongCreds"); 
+    loading = false; 
+    render();
   }
 }
 
@@ -377,17 +467,43 @@ async function doLogin() {
 // DATA LOADERS
 // ============================================================
 async function loadMeetings() {
-  loading = true; render();
-  try { const r = await apiGet("getMeetings"); meetings = r.meetings || []; }
-  catch { meetings = []; }
-  loading = false; showAddForm = false; editingId = null; render();
+  loading = true; 
+  render();
+  try { 
+    const r = await apiGet("getMeetings"); 
+    meetings = r.meetings || []; 
+    debugLog(`Loaded ${meetings.length} meetings`);
+  } catch(e) { 
+    debugLog(`Error loading meetings: ${e.message}`);
+    meetings = []; 
+  }
+  loading = false; 
+  showAddForm = false; 
+  editingId = null; 
+  render();
 }
 
 async function loadUsers() {
-  loading = true; render();
-  try { const r = await apiGet("getUsers"); users = r.users || []; }
-  catch { users = []; }
-  loading = false; showAddUser = false; render();
+  loading = true; 
+  render();
+  try { 
+    const r = await apiGet("getUsers"); 
+    if (r.success && r.users) {
+      users = r.users.map(u => ({
+        ...u,
+        isAdmin: u.isadmin === true || u.isadmin === "true"
+      }));
+      debugLog(`Loaded ${users.length} users`);
+    } else {
+      users = [];
+    }
+  } catch(e) { 
+    debugLog(`Error loading users: ${e.message}`);
+    users = []; 
+  }
+  loading = false; 
+  showAddUser = false; 
+  render();
 }
 
 // ============================================================
@@ -396,46 +512,83 @@ async function loadUsers() {
 async function doDeleteMeeting(id) {
   if (!confirm(t("confirmDel"))) return;
   loading = true; render();
-  try { await apiPost({ action: "deleteMeeting", id }); } catch {}
+  try { 
+    await apiPost({ action: "deleteMeeting", id: id }); 
+    debugLog(`Deleted meeting ${id}`);
+  } catch(e) { debugLog(`Delete error: ${e.message}`); }
   await loadMeetings();
 }
 
 async function doArchive(id, val) {
   loading = true; render();
   const m = meetings.find(x => String(x.id) === String(id));
-  if (!m) { loading = false; render(); return; }
+  if (!m) { 
+    loading = false; 
+    render(); 
+    return; 
+  }
   try {
-    await apiPost({ action: "deleteMeeting", id });
-    await apiPost({ action: "saveMeeting", ...m, archived: val });
-  } catch {}
+    await apiPost({ action: "deleteMeeting", id: id });
+    const meetingData = {
+      action: "saveMeeting",
+      id: m.id,
+      title_mk: m.title_mk || "",
+      title_en: m.title_en || "",
+      date: m.date || "",
+      time: m.time || "",
+      location: m.location || "",
+      attendees: m.attendees || "",
+      agenda_mk: m.agenda_mk || "",
+      agenda_en: m.agenda_en || "",
+      minutes_mk: m.minutes_mk || "",
+      minutes_en: m.minutes_en || "",
+      decisions_mk: m.decisions_mk || "",
+      decisions_en: m.decisions_en || "",
+      createdBy: m.createdby || m.createdBy || "",
+      archived: val
+    };
+    await apiPost(meetingData);
+    debugLog(`Archived meeting ${id} to ${val}`);
+  } catch(e) { debugLog(`Archive error: ${e.message}`); }
   await loadMeetings();
 }
 
 async function doSaveMeeting() {
-  const g = id => document.getElementById(id)?.value || "";
+  const getVal = (id, fallback = "") => document.getElementById(id)?.value || fallback;
+  
   const data = {
-    action:       "saveMeeting",
-    id:           g("f-id") || Date.now(),
-    title_mk:     g("f-tmk"),
-    title_en:     g("f-ten"),
-    date:         g("f-date"),
-    time:         g("f-time"),
-    location:     g("f-loc"),
-    attendees:    g("f-att"),
-    agenda_mk:    g("f-amk"),
-    agenda_en:    g("f-aen"),
-    minutes_mk:   g("f-mmk"),
-    minutes_en:   g("f-men"),
-    decisions_mk: g("f-dmk"),
-    decisions_en: g("f-den"),
-    createdBy:    currentUser.name || currentUser.email,
-    archived:     false
+    action: "saveMeeting",
+    id: getVal("f-id") || Date.now().toString(),
+    title_mk: getVal("f-tmk"),
+    title_en: getVal("f-ten"),
+    date: getVal("f-date"),
+    time: getVal("f-time"),
+    location: getVal("f-loc"),
+    attendees: getVal("f-att"),
+    agenda_mk: getVal("f-amk"),
+    agenda_en: getVal("f-aen"),
+    minutes_mk: getVal("f-mmk"),
+    minutes_en: getVal("f-men"),
+    decisions_mk: getVal("f-dmk"),
+    decisions_en: getVal("f-den"),
+    createdBy: currentUser?.name || currentUser?.email || "Unknown",
+    archived: false
   };
-  loading = true; render();
-  if (editingId) {
-    try { await apiPost({ action: "deleteMeeting", id: editingId }); } catch {}
+  
+  debugLog(`Saving meeting: ${data.title_mk}`);
+  loading = true; 
+  render();
+  
+  try {
+    if (editingId) {
+      await apiPost({ action: "deleteMeeting", id: editingId });
+    }
+    await apiPost(data);
+    debugLog(`Meeting saved successfully`);
+  } catch(e) { 
+    debugLog(`Save meeting error: ${e.message}`);
   }
-  try { await apiPost(data); } catch {}
+  
   editingId = null;
   await loadMeetings();
 }
@@ -444,48 +597,63 @@ async function doSaveMeeting() {
 // USER ACTIONS
 // ============================================================
 async function doSaveUser() {
-  const g = id => document.getElementById(id)?.value || "";
+  const getVal = (id) => document.getElementById(id)?.value || "";
   const data = {
-    action:   "saveUser",
-    id:       Date.now(),
-    name:     g("fu-name"),
-    position: g("fu-pos"),
-    email:    g("fu-email"),
-    password: g("fu-pass"),
-    isAdmin:  document.getElementById("fu-admin")?.checked || false
+    action: "saveUser",
+    id: Date.now().toString(),
+    name: getVal("fu-name"),
+    position: getVal("fu-pos"),
+    email: getVal("fu-email"),
+    password: getVal("fu-pass"),
+    isAdmin: document.getElementById("fu-admin")?.checked || false
   };
+  debugLog(`Saving user: ${data.email}`);
   loading = true; render();
-  try { await apiPost(data); } catch {}
+  try { 
+    await apiPost(data); 
+    debugLog(`User saved successfully`);
+  } catch(e) { debugLog(`Save user error: ${e.message}`); }
   await loadUsers();
 }
 
 // ============================================================
 // EXPORT WORD
 // ============================================================
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/[&<>]/g, function(m) {
+    if (m === '&') return '&amp;';
+    if (m === '<') return '&lt;';
+    if (m === '>') return '&gt;';
+    return m;
+  });
+}
+
 function doExportWord(id) {
   const m = meetings.find(x => String(x.id) === String(id));
   if (!m) return;
   const html = `<html><body style="font-family:Calibri,sans-serif;max-width:700px;margin:auto;padding:30px">
-<h1 style="color:#003399">${m.title_mk || ""}</h1>
-<h2 style="color:#555">${m.title_en || ""}</h2>
+<h1 style="color:#003399">${escapeHtml(m.title_mk || "")}</h1>
+<h2 style="color:#555">${escapeHtml(m.title_en || "")}</h2>
 <table style="border-collapse:collapse;width:100%;margin:16px 0;font-size:13px">
-  <tr><td style="padding:5px 8px;color:#666;width:140px">Датум / Date</td><td style="padding:5px 8px">${m.date || ""} ${m.time || ""}</td></tr>
-  <tr><td style="padding:5px 8px;color:#666">Локација / Location</td><td style="padding:5px 8px">${m.location || "-"}</td></tr>
-  <tr><td style="padding:5px 8px;color:#666">Учесници / Attendees</td><td style="padding:5px 8px">${m.attendees || "-"}</td></tr>
-  <tr><td style="padding:5px 8px;color:#666">${t("by")}</td><td style="padding:5px 8px">${m.createdby || m.createdBy || "-"}</td></tr>
+  <tr><td style="padding:5px 8px;color:#666;width:140px">Датум / Date</td><td style="padding:5px 8px">${escapeHtml(m.date || "")} ${escapeHtml(m.time || "")}</td></tr>
+  <tr><td style="padding:5px 8px;color:#666">Локација / Location</td><td style="padding:5px 8px">${escapeHtml(m.location || "-")}</td></tr>
+  <tr><td style="padding:5px 8px;color:#666">Учесници / Attendees</td><td style="padding:5px 8px">${escapeHtml(m.attendees || "-")}</td></tr>
+  <tr><td style="padding:5px 8px;color:#666">${t("by")}</td><td style="padding:5px 8px">${escapeHtml(m.createdby || m.createdBy || "-")}</td></tr>
 </table>
-${m.agenda_mk   ? `<h3 style="color:#003399;margin-top:20px">Агенда</h3><p style="white-space:pre-wrap;font-size:13px">${m.agenda_mk}</p>` : ""}
-${m.agenda_en   ? `<h3 style="color:#003399">Agenda</h3><p style="white-space:pre-wrap;font-size:13px">${m.agenda_en}</p>` : ""}
-${m.minutes_mk  ? `<h3 style="color:#003399;margin-top:20px">Записник</h3><p style="white-space:pre-wrap;font-size:13px">${m.minutes_mk}</p>` : ""}
-${m.minutes_en  ? `<h3 style="color:#003399">Minutes</h3><p style="white-space:pre-wrap;font-size:13px">${m.minutes_en}</p>` : ""}
-${m.decisions_mk? `<h3 style="color:#003399;margin-top:20px">Одлуки</h3><p style="white-space:pre-wrap;font-size:13px">${m.decisions_mk}</p>` : ""}
-${m.decisions_en? `<h3 style="color:#003399">Decisions</h3><p style="white-space:pre-wrap;font-size:13px">${m.decisions_en}</p>` : ""}
+${m.agenda_mk ? `<h3 style="color:#003399;margin-top:20px">Агенда</h3><p style="white-space:pre-wrap;font-size:13px">${escapeHtml(m.agenda_mk)}</p>` : ""}
+${m.agenda_en ? `<h3 style="color:#003399">Agenda</h3><p style="white-space:pre-wrap;font-size:13px">${escapeHtml(m.agenda_en)}</p>` : ""}
+${m.minutes_mk ? `<h3 style="color:#003399;margin-top:20px">Записник</h3><p style="white-space:pre-wrap;font-size:13px">${escapeHtml(m.minutes_mk)}</p>` : ""}
+${m.minutes_en ? `<h3 style="color:#003399">Minutes</h3><p style="white-space:pre-wrap;font-size:13px">${escapeHtml(m.minutes_en)}</p>` : ""}
+${m.decisions_mk ? `<h3 style="color:#003399;margin-top:20px">Одлуки</h3><p style="white-space:pre-wrap;font-size:13px">${escapeHtml(m.decisions_mk)}</p>` : ""}
+${m.decisions_en ? `<h3 style="color:#003399">Decisions</h3><p style="white-space:pre-wrap;font-size:13px">${escapeHtml(m.decisions_en)}</p>` : ""}
 </body></html>`;
   const a = Object.assign(document.createElement("a"), {
     href: URL.createObjectURL(new Blob([html], { type: "application/msword" })),
     download: `meeting-${m.id}.doc`
   });
   a.click();
+  debugLog(`Exported meeting ${id} to Word`);
 }
 
 // ============================================================
@@ -497,17 +665,18 @@ function renderLogin() {
   <div class="card" style="max-width:340px;width:100%">
     <div style="text-align:center;margin-bottom:1rem">
       <div style="width:44px;height:44px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;margin:0 auto 8px">
-        ${ICONS.lock}
+        🔒
       </div>
       <p style="font-size:15px;font-weight:500">${t("login")}</p>
+      <p style="font-size:11px;color:var(--color-text-tertiary);margin-top:5px">admin@example.com / admin123</p>
     </div>
     <label>${t("email")}</label>
-    <input id="ie" type="email" placeholder="user@example.com"
+    <input id="ie" type="email" placeholder="admin@example.com" value="admin@example.com"
       onkeydown="if(event.key==='Enter')document.getElementById('ip').focus()">
     <label>${t("pass")}</label>
-    <input id="ip" type="password" placeholder="••••••"
+    <input id="ip" type="password" placeholder="admin123" value="admin123"
       onkeydown="if(event.key==='Enter')doLogin()">
-    ${loginErr ? `<div class="err">${ICONS.alert} ${loginErr}</div>` : ""}
+    ${loginErr ? `<div class="err">⚠️ ${loginErr}</div>` : ""}
     <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="doLogin()">
       ${loading ? `<span class="spinner"></span>` : ""} ${t("signIn")}
     </button>
@@ -525,27 +694,27 @@ function renderMeetingForm(m) {
     <p style="font-size:14px;font-weight:500;margin-bottom:10px">${isEdit ? t("editMeeting") : t("addMeeting")}</p>
     <input type="hidden" id="f-id" value="${v("id")}">
     <div class="row2">
-      <div><label>${t("titleMk")}</label><input id="f-tmk" value="${v("title_mk")}"></div>
-      <div><label>${t("titleEn")}</label><input id="f-ten" value="${v("title_en")}"></div>
+      <div><label>${t("titleMk")}</label><input id="f-tmk" value="${escapeHtml(v("title_mk"))}"></div>
+      <div><label>${t("titleEn")}</label><input id="f-ten" value="${escapeHtml(v("title_en"))}"></div>
     </div>
     <div class="row3">
       <div><label>${t("date")}</label><input id="f-date" type="date" value="${v("date")}"></div>
       <div><label>${t("time")}</label><input id="f-time" type="time" value="${v("time")}"></div>
-      <div><label>${t("location")}</label><input id="f-loc" value="${v("location")}"></div>
+      <div><label>${t("location")}</label><input id="f-loc" value="${escapeHtml(v("location"))}"></div>
     </div>
     <label>${t("attendees")}</label>
-    <input id="f-att" placeholder="А. Петров, Б. Ристова…" value="${v("attendees")}">
+    <input id="f-att" placeholder="А. Петров, Б. Ристова…" value="${escapeHtml(v("attendees"))}">
     <div class="row2">
-      <div><label>${t("agendaMk")}</label><textarea id="f-amk">${v("agenda_mk")}</textarea></div>
-      <div><label>${t("agendaEn")}</label><textarea id="f-aen">${v("agenda_en")}</textarea></div>
+      <div><label>${t("agendaMk")}</label><textarea id="f-amk">${escapeHtml(v("agenda_mk"))}</textarea></div>
+      <div><label>${t("agendaEn")}</label><textarea id="f-aen">${escapeHtml(v("agenda_en"))}</textarea></div>
     </div>
     <div class="row2">
-      <div><label>${t("minutesMk")}</label><textarea id="f-mmk">${v("minutes_mk")}</textarea></div>
-      <div><label>${t("minutesEn")}</label><textarea id="f-men">${v("minutes_en")}</textarea></div>
+      <div><label>${t("minutesMk")}</label><textarea id="f-mmk">${escapeHtml(v("minutes_mk"))}</textarea></div>
+      <div><label>${t("minutesEn")}</label><textarea id="f-men">${escapeHtml(v("minutes_en"))}</textarea></div>
     </div>
     <div class="row2">
-      <div><label>${t("decisionsMk")}</label><textarea id="f-dmk">${v("decisions_mk")}</textarea></div>
-      <div><label>${t("decisionsEn")}</label><textarea id="f-den">${v("decisions_en")}</textarea></div>
+      <div><label>${t("decisionsMk")}</label><textarea id="f-dmk">${escapeHtml(v("decisions_mk"))}</textarea></div>
+      <div><label>${t("decisionsEn")}</label><textarea id="f-den">${escapeHtml(v("decisions_en"))}</textarea></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="btn btn-primary" onclick="doSaveMeeting()">${t("save")}</button>
@@ -569,9 +738,9 @@ function renderMeetings() {
   let html = `
   <div class="section-head">
     <span style="font-size:13px;color:var(--color-text-secondary)">${list.length} ${t("meetings")}</span>
-    <button class="btn btn-primary btn-sm" onclick="showAddForm=!showAddForm;editingId=null;render()">
+    ${isAdmin() ? `<button class="btn btn-primary btn-sm" onclick="showAddForm=!showAddForm;editingId=null;render()">
       ${t("addMeeting")}
-    </button>
+    </button>` : ""}
   </div>
   <div class="filter-row">
     <input placeholder="${t("search")}" value="${filter}" oninput="filter=this.value;render()">
@@ -580,20 +749,17 @@ function renderMeetings() {
     </button>
   </div>`;
 
-  if (showAddForm && !editingId) html += renderMeetingForm(null);
+  if (showAddForm && !editingId && isAdmin()) html += renderMeetingForm(null);
 
   if (list.length === 0) {
-    html += `<div class="empty">
-      <div style="margin-bottom:6px">${ICONS.calOff}</div>
-      ${t("noMeetings")}
-    </div>`;
+    html += `<div class="empty">📭 ${t("noMeetings")}</div>`;
   } else {
     html += list.map(m => {
       const isArch = String(m.archived) === "true";
       const exp    = String(expandedId) === String(m.id);
       const isEdit = String(editingId)  === String(m.id);
 
-      if (isEdit) return renderMeetingForm(m);
+      if (isEdit && isAdmin()) return renderMeetingForm(m);
 
       const title    = lang === "mk" ? m.title_mk || m.title_en : m.title_en || m.title_mk;
       const agenda   = lang === "mk" ? m.agenda_mk   : m.agenda_en;
@@ -604,38 +770,38 @@ function renderMeetings() {
       <div class="meeting-card${isArch ? " archived" : ""}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
           <div style="flex:1;min-width:0">
-            <div class="mtitle">${title || "—"}</div>
+            <div class="mtitle">${escapeHtml(title) || "—"}</div>
             <div class="mmeta">
-              ${m.date    ? `<span>${ICONS.calSm} ${m.date}${m.time ? " " + m.time : ""}</span>` : ""}
-              ${m.location? `<span>${ICONS.pin} ${m.location}</span>` : ""}
-              ${m.attendees?`<span>${ICONS.users} ${m.attendees}</span>` : ""}
+              ${m.date    ? `<span>📅 ${m.date}${m.time ? " " + m.time : ""}</span>` : ""}
+              ${m.location? `<span>📍 ${escapeHtml(m.location)}</span>` : ""}
+              ${m.attendees?`<span>👥 ${escapeHtml(m.attendees)}</span>` : ""}
             </div>
-            ${agenda ? `<div class="magenda">${agenda.length > 140 ? agenda.slice(0, 140) + "…" : agenda}</div>` : ""}
+            ${agenda ? `<div class="magenda">${escapeHtml(agenda.length > 140 ? agenda.slice(0, 140) + "…" : agenda)}</div>` : ""}
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
             ${isArch ? `<span class="badge badge-gray">${t("archived")}</span>` : ""}
-            ${(m.createdby || m.createdBy) ? `<span class="badge badge-info">${m.createdby || m.createdBy}</span>` : ""}
+            ${(m.createdby || m.createdBy) ? `<span class="badge badge-info">${escapeHtml(m.createdby || m.createdBy)}</span>` : ""}
           </div>
         </div>
 
         ${exp ? `<div class="detail-block">
-          ${minutes   ? `<div class="detail-label">${lang==="mk"?t("minutesMk"):t("minutesEn")}</div><div class="detail-text">${minutes}</div>` : ""}
-          ${decisions ? `<div class="detail-label" style="margin-top:8px">${lang==="mk"?t("decisionsMk"):t("decisionsEn")}</div><div class="detail-text">${decisions}</div>` : ""}
+          ${minutes   ? `<div class="detail-label">${lang==="mk"?t("minutesMk"):t("minutesEn")}</div><div class="detail-text">${escapeHtml(minutes)}</div>` : ""}
+          ${decisions ? `<div class="detail-label" style="margin-top:8px">${lang==="mk"?t("decisionsMk"):t("decisionsEn")}</div><div class="detail-text">${escapeHtml(decisions)}</div>` : ""}
         </div>` : ""}
 
         <div class="mactions">
           ${(minutes || decisions) ? `<button class="expand-btn" onclick="expandedId=expandedId===String(${m.id})?null:'${m.id}';render()">${exp ? t("hideDetails") : t("details")}</button>` : ""}
           <button class="btn btn-xs" onclick="doExportWord('${m.id}')">
-            ${ICONS.fileText} ${t("exportWord")}
+            📄 ${t("exportWord")}
           </button>
           ${isAdmin() ? `<button class="btn btn-xs" onclick="editingId='${m.id}';showAddForm=false;render()" aria-label="Edit">
-            ${ICONS.edit}
+            ✏️
           </button>` : ""}
           ${isAdmin() ? `<button class="btn btn-xs" onclick="doArchive('${m.id}',${!isArch})" aria-label="${isArch ? t('unarchive') : t('archive')}">
-            ${ICONS.archive}
+            📦
           </button>` : ""}
           ${isAdmin() ? `<button class="btn btn-xs btn-danger" onclick="doDeleteMeeting('${m.id}')" aria-label="${t('delete')}">
-            ${ICONS.trash}
+            🗑️
           </button>` : ""}
         </div>
       </div>`;
@@ -659,12 +825,12 @@ function renderUsers() {
     <div class="card" style="border-color:#185fa5">
       <p style="font-size:14px;font-weight:500;margin-bottom:10px">${t("addUser")}</p>
       <div class="row2">
-        <div><label>${t("name")}</label><input id="fu-name"></div>
-        <div><label>${t("position")}</label><input id="fu-pos"></div>
+        <div><label>${t("name")}</label><input id="fu-name" placeholder="Име Презиме"></div>
+        <div><label>${t("position")}</label><input id="fu-pos" placeholder="Позиција"></div>
       </div>
       <div class="row2">
-        <div><label>${t("email")}</label><input id="fu-email" type="email"></div>
-        <div><label>${t("pass")}</label><input id="fu-pass" type="password"></div>
+        <div><label>${t("email")}</label><input id="fu-email" type="email" placeholder="email@example.com"></div>
+        <div><label>${t("pass")}</label><input id="fu-pass" type="password" placeholder="********"></div>
       </div>
       <label style="display:flex;align-items:center;gap:6px;margin-top:10px;cursor:pointer">
         <input id="fu-admin" type="checkbox" style="width:auto"> ${t("isAdmin")}
@@ -677,21 +843,24 @@ function renderUsers() {
   }
 
   if (users.length === 0) {
-    html += `<div class="empty">${t("noUsers")}</div>`;
+    html += `<div class="empty">👥 ${t("noUsers")}</div>`;
   } else {
-    html += users.map(u => `
+    html += users.map(u => {
+      const isUserAdmin = String(u.isadmin || u.isAdmin) === "true";
+      return `
     <div class="card" style="display:flex;align-items:center;gap:12px;padding:10px 14px">
-      <div class="avatar">${ini(u.name)}</div>
+      <div class="avatar">${escapeHtml(ini(u.name))}</div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:500">${u.name || ""}</div>
+        <div style="font-size:14px;font-weight:500">${escapeHtml(u.name || "")}</div>
         <div style="font-size:12px;color:var(--color-text-secondary)">
-          ${u.position || ""}${u.email ? " · " + u.email : ""}
+          ${escapeHtml(u.position || "")}${u.email ? " · " + escapeHtml(u.email) : ""}
         </div>
       </div>
-      ${String(u.isadmin || u.isAdmin) === "true"
-        ? `<span class="badge badge-info">${t("admin")}</span>`
+      ${isUserAdmin
+        ? `<span class="badge badge-info">👑 ${t("admin")}</span>`
         : `<span class="badge badge-gray">${t("users")}</span>`}
-    </div>`).join("");
+    </div>`;
+    }).join("");
   }
   return html;
 }
@@ -707,9 +876,9 @@ function render() {
   if (currentUser) {
     ub.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px">
-      <div class="avatar">${ini(currentUser.name || currentUser.email)}</div>
+      <div class="avatar">${escapeHtml(ini(currentUser.name || currentUser.email))}</div>
       <span style="font-size:13px;color:var(--color-text-secondary);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-        ${currentUser.name || currentUser.email}
+        ${escapeHtml(currentUser.name || currentUser.email)}
       </span>
       <button class="btn btn-sm" onclick="currentUser=null;meetings=[];users=[];render()">${t("logout")}</button>
     </div>`;
@@ -737,25 +906,9 @@ function render() {
 }
 
 // ============================================================
-// INLINE SVG ICONS — no CDN needed
-// ============================================================
-const ICONS = {
-  lock:        `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>`,
-  alert:       `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="currentColor"/></svg>`,
-  calendar:    `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="4" y1="11" x2="20" y2="11"/></svg>`,
-  calSm:       `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-1px"><rect x="4" y="5" width="16" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="4" y1="11" x2="20" y2="11"/></svg>`,
-  calOff:      `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="4" y1="11" x2="20" y2="11"/><line x1="10" y1="14" x2="14" y2="18"/><line x1="14" y1="14" x2="10" y2="18"/></svg>`,
-  pin:         `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-1px"><path d="M12 2C8.7 2 6 4.7 6 8c0 4.5 6 12 6 12s6-7.5 6-12c0-3.3-2.7-6-6-6z"/><circle cx="12" cy="8" r="2"/></svg>`,
-  users:       `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-1px"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/><path d="M21 21v-2a4 4 0 0 0-3-3.9"/></svg>`,
-  fileText:    `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>`,
-  edit:        `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
-  archive:     `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`,
-  trash:       `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`,
-};
-
-// ============================================================
 // BOOT
 // ============================================================
+debugLog("Application started");
 render();
 </script>
 </body>
